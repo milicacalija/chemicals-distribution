@@ -1,0 +1,38 @@
+{
+  "name": "proba2",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "start": "concurrently \"npm run start-backend\" \"npm run start-proba2\"",
+    "start-backend": "node glavno.js",
+    "start-proba2": "npm run serve",
+    "serve": "vue-cli-service serve",
+    "build": "vue-cli-service build"
+  },
+  "dependencies": {
+    "@paypal/checkout-server-sdk": "^1.0.3",
+    "@sendgrid/mail": "^8.1.5",
+    "@stripe/stripe-js": "^4.10.0",
+    "axios": "^1.6.2",
+    "body-parser": "^1.20.2",
+    "concurrently": "^8.2.2",
+    "core-js": "^3.8.3",
+    "cors": "^2.8.5",
+    "express-session": "^1.18.0",
+    "moment-timezone": "^0.5.45",
+    "nodemailer": "^7.0.5",
+    "nodemon": "^3.0.1",
+    "pdfkit": "^0.17.1",
+    "puppeteer": "^24.17.1",
+    "stripe": "^16.12.0",
+    "sweetalert2": "^11.22.4",
+    "vue": "^2.6.14",
+    "vue-router": "^3.5.1"
+  },
+  "devDependencies": {
+    "@vue/cli-plugin-babel": "~5.0.0",
+    "@vue/cli-plugin-router": "~5.0.0",
+    "@vue/cli-service": "~5.0.0",
+    "vue-template-compiler": "^2.6.14"
+  }
+}

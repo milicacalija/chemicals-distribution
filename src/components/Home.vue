@@ -14,8 +14,7 @@
           <!-- Glavna navigacija -->
           <router-link to="/proizvodi">Hemikalije</router-link>
           <router-link to="/primena">Primena</router-link>
-                    <router-link to="/piktogrami">Piktogrami</router-link>
-
+          <router-link to="/piktogrami">Piktogrami</router-link>
           <router-link to="/kontakt">Kontakt</router-link>
 
           <!-- Linkovi za neulogovanog korisnika -->
@@ -24,17 +23,12 @@
             <router-link to="/nalog">Kreiraj nalog</router-link>
           </template>
 
-
-           <!-- Ako je ulogovan običan korisnik -->
+          <!-- Ako je ulogovan običan korisnik -->
           <template v-else-if="!isAdmin">
             <router-link to="/profil">Moj profil ({{ usrName }})</router-link>
           </template>
-          
 
-
-          <!-- Link za admina, Da, tačno – ako u localStorage već postoji userLevel = 0 i usr_id, Vue misli da si admin i zato prikazuje Admin panel i ne pokazuje linkove za “Uloguj se / Kreiraj nalog”. kad se obrise local storage Sjajno! 🎉 Super što sada sve funkcioniše kako treba — običan korisnik vidi Moj profil (ime), neulogovan vidi Uloguj se / Kreiraj nalog, a admin će videti svoj Admin panel kad se uloguje.
-
-Da očistiš localStorage i testiraš različite scenarije: -->
+          <!-- Link za admina -->
           <router-link v-if="isAdmin" to="/admin">Admin panel</router-link>
 
           <!-- Kontakt info -->
@@ -82,35 +76,60 @@ Da očistiš localStorage i testiraš različite scenarije: -->
       <span class="address">Personal Data Protection<br>Cookie Policy</span>
     </div>
 
+
+    
+    <!-- Chatbox (plivajući) -->
+    <div class="chatbox" :class="{ open: chatOpen }">
+      <div class="chat-header" @click="chatOpen = !chatOpen">
+        <span>Kako Vam možemo pomoći!</span>
+        <span v-if="chatOpen">&#10006;</span>
+        <span v-else>&#128172;</span>
+      </div>
+      <div class="chat-body" v-if="chatOpen">
+        <div class="messages">
+          <div v-for="(msg, index) in messages" :key="index" class="message">
+            <strong>{{ msg.sender }}:</strong> {{ msg.text }}
+          </div>
+        </div>
+        <input type="text" v-model="newMessage" @keyup.enter="sendMessage" placeholder="Upiši poruku..." />
+        <button @click="sendMessage">Pošalji</button>
+      </div>
+    </div>
+
   </div>
 </template>
+
 
   
 
  <script>
+import axios from 'axios';
+
 export default {
   name: "Home",
-computed: {
+  computed: {
     isLoggedIn() {
       return !!localStorage.getItem('usr_id');
     },
-    //Ako u localStorage nije postavljen userLevel, localStorage.getItem('userLevel') vraća null. Number(null) daje 0 u JavaScript-u! 🔑To znači da Vue misli da si admin čak i kada nisi ulogovana. Zato link Admin panel uvek prikazuje, dodajem proveru da se vidi da li je uopste korisnik ulogovan,pre nego sto vidimo da li je admin
     isAdmin() {
-  const userLevel = localStorage.getItem('userLevel');
-  const usrId = localStorage.getItem('usr_id');
-  return usrId && Number(userLevel) === 0;
-},
+      const userLevel = localStorage.getItem('userLevel');
+      const usrId = localStorage.getItem('usr_id');
+      return usrId && Number(userLevel) === 0;
+    },
     usrName() {
       return localStorage.getItem('userName') || '';
     }
   },
-
-   
   data() {
     return {
+      // Chatbox
+      chatOpen: false,
+      newMessage: "",
+      messages: [], // poruke u chatbox-u
+      guestId: 'guest-' + Math.floor(Math.random() * 10000), // jedinstveni ID anonimnog korisnika
       
-            showSlideshow: true,
-        //Ne možeš primeniti CSS direktno na JS objekat (slides), jer CSS radi samo sa HTML elementima.Ključ je renderovati te objekte u HTML (putem v-for ili map funkcije) i dodeliti im klase.Nakon toga jedan CSS stil može da važi za sve slide-ove istovremeno.
+      // Slideshow
+      showSlideshow: true,
       currentIndex: 0,
       slides: [
         {
@@ -119,22 +138,21 @@ computed: {
         },
         {
           title: "Industrijske potrebe",
-          text: "Zadovoljavamo potrebe proizvodnje i kontole kvaliteta za širok spektar različith grana industrije medicine, farmacije, poljoprivrede, prehrane ..."
+          text: "Zadovoljavamo potrebe proizvodnje i kontrole kvaliteta za širok spektar različith grana industrije medicine, farmacije, poljoprivrede, prehrane ..."
         },
         {
           title: "Proizvodi visokog stepena čistoće i kvaliteta",
-          text: " Hemikalije sa visokim stepenom čistoće koje zadovoljavaju ISO standarde analitičkih i tehničkih reagenasa."
+          text: "Hemikalije sa visokim stepenom čistoće koje zadovoljavaju ISO standarde analitičkih i tehničkih reagenasa."
         },
-
-        { title: "Karijera",
-            text: "Naš tim čine mladi, stručni, ambiciozni i proaktivni ljudi posvećeni kreativnim biznis idejama koje  pouzdano zadovoljavaju usluge naših klijenata. Sa zadovoljstvom pridruži nam se i TI. Pošalji nam svoj CV na našu mail adresu i u kratkom roku očekuj naš poziv."
+        {
+          title: "Karijera",
+          text: "Naš tim čine mladi, stručni, ambiciozni i proaktivni ljudi posvećeni kreativnim biznis idejama koje pouzdano zadovoljavaju usluge naših klijenata. Pošalji nam svoj CV na našu mail adresu i u kratkom roku očekuj naš poziv."
         },
-            
       ]
     };
   },
   methods: {
-   
+    // Slideshow metode
     prevSlide() {
       this.currentIndex = (this.currentIndex - 1 + this.slides.length) % this.slides.length;
       this.updateSlidePosition();
@@ -144,29 +162,65 @@ computed: {
       this.updateSlidePosition();
     },
     updateSlidePosition() {
-  const slideshow = this.$refs.slideshow;
-  if (!slideshow) return; // ako još nije renderovan, izađi
-  slideshow.style.transform = `translateX(-${this.currentIndex * 100}%)`;
-}
-  },
+      const slideshow = this.$refs.slideshow;
+      if (!slideshow) return;
+      slideshow.style.transform = `translateX(-${this.currentIndex * 100}%)`;
+    },
+
+    // Chat metode
+    
+  sendMessage() {
+    if (!this.newMessage) return;
+
+    
+
+   const userId = localStorage.getItem('usr_id'); // ID ulogovanog korisnika
+  const payload = {
+    fk_user_sender: userId ? Number(userId) : null,
+    user_id_reciver: 0,              // admin
+    por_content: this.newMessage,
+    tip: 'poruka',
+    user_anonim: userId ? null : -1   // anonimni ako nije ulogovan
+  };
+
+  // Dodaj poruku lokalno
+  this.messages.push({
+    sender: userId ? 'Vi' : 'Anonimni',
+    text: this.newMessage
+  });
+
+    axios.post('http://localhost:3014/poruke', payload)
+      .then(() => {
+        // automatski odgovor admina posle 1 sekunde
+        setTimeout(() => {
+          this.messages.push({ sender: 'Admin', text: 'Vaš zahtev će biti obrađen u najkraćem roku.' });
+        }, 1000);
+      })
+      .catch(err => console.error(err));
+
+    // Očisti input
+    this.newMessage = "";
+  }
+},
   mounted() {
-//Ah, sada je jasno zašto dobijaš “can't access property 'style', slideshow is undefined” Problem je u Vue2 ref i renderovanju sa v-if / v-for`:Tvoja funkcija updateSlidePosition() koristi this.$refs.slideshow.Ako this.$refs.slideshow još nije renderovan u DOM-u (npr. v-if="showSlideshow" je false), onda je this.$refs.slideshow undefined.Zato dobijaš grešku kada pokušavaš slideshow.style.transform.
-        this.showSlideshow = false; // sakrijemo kada komponenta mount-uje
-     // Obezbedite da je referenca na slideshow dostupna pre nego što pozovete updateSlidePosition
-     this.$nextTick(() => {
-      this.updateSlidePosition(); // Postavite početni položaj slajdova
+    // Slideshow
+    this.showSlideshow = false;
+    this.$nextTick(() => {
+      this.updateSlidePosition();
       setInterval(() => {
         this.nextSlide();
-      }, 10000); // Usporite automatsku animaciju na 10 sekundi
+      }, 10000);
     });
   }
-  };
+};
 </script>
 
 
+
+
   
   
-  <style>
+  <style scoped>
   body {
     margin: 0;
   padding: 0;
@@ -361,52 +415,163 @@ computed: {
 
 .next {right: 20px; /* Razmak od desne ivice */
 }
-/* Responsive za mobilne telefone */
-@media (max-width: 768px) {
- .slide {
-  display: flex;
-  justify-content: flex-start;
-  align-items: center;
-  text-align: left;
-  
-  /* Nema fiksne visine */
-  width: 100%;
-  aspect-ratio: 16 / 9; /* održava proporciju slike */
-  
-  background-size: cover;
-  background-position: center;
-  background-repeat: no-repeat;
-  
-  padding-left: 50px;
-  position: relative;
-  color: white;
+
+/* Chatbox container */
+.chatbox {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  width: 320px; /* povećano za duži tekst */
+    max-height: 400px;
+  background: #fff;
+  border: 1px solid #ccc;
+  border-radius: 10px;
+  overflow: hidden;
+  box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+  transition: all 0.3s ease;
+  font-family: Arial, sans-serif;
+  z-index: 1000;
 }
-  .slide-title {
-    font-size: 22px;
-  }
-  .slide-text {
-    font-size: 14px;
-    max-width: 90%;
-  }
-  .slide-content {
-    max-width: 95%;
-    padding: 10px;
+
+/* Chatbox collapsed */
+.chatbox:not(.open) {
+  height: 40px;
+  width: 280px;
+  cursor: pointer;
+}
+
+/* Chat header */
+.chat-header {
+  background: #641515;
+  color: white;
+  padding: 10px;
+  font-weight: bold;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  cursor: pointer;
+}
+
+/* Chat body */
+.chat-body {
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  height: 300px;
+}
+
+/* Messages */
+.messages {
+  flex: 1;
+  overflow-y: auto;
+  margin-bottom: 10px;
+}
+
+.message {
+  margin-bottom: 5px;
+  padding: 5px;
+  border-radius: 5px;
+  background: #f1f1f1;
+}
+
+/* Input and button */
+.chat-body input[type="text"] {
+  width: calc(100% - 60px);
+  padding: 5px;
+  margin-right: 5px;
+  border: 1px solid #ccc;
+  border-radius: 5px;
+}
+
+.chat-body button {
+  padding: 5px 10px;
+  background:  #641515;
+  border: none;
+  color: white;
+  border-radius: 5px;
+  cursor: pointer;
+}
+
+.chat-body button:hover {
+  background: #390c0c;
+}
+
+@media (max-width: 768px) {
+  /* Logo i navigacija */
+  .logo {
+    width: 80px;
   }
 
   .logo-text {
-    font-size: 24px;
+    font-size: 28px;
   }
+
   .nav-links {
     flex-direction: column;
-    gap: 10px;
-    margin-right: 10px;
+    align-items: center;
+    gap: 15px;
+    margin: 0;
+    margin-top: 10px;
   }
+
   .nav-links a {
+    font-size: 16px;
+    margin: 0;
+  }
+
+  
+
+  /* Slajdovi za mobilne */
+  .slide {
+    min-height: 300px;  
+    width: 100%;
+    background-size: cover;
+    background-position: center;
+    display: flex;
+    justify-content: center; /* horizontalno centriranje */
+    align-items: center;     /* vertikalno centriranje */
+    padding: 0 15px;
+    color: white;
+    text-align: center;      /* centriran tekst */
+  }
+
+  .slide-content {
+    max-width: 95%;
+    padding: 10px;
+    background: rgba(0,0,0,0.4);
+    border-radius: 10px;
+  }
+
+  .slide-title {
+    font-size: 20px;
+    margin-bottom: 6px;
+  }
+
+  .slide-text {
     font-size: 14px;
+    line-height: 1.4;
+  }
+
+  /* Chatbox – postavimo da ne preklapa slajd */
+  .chatbox {
+    position: relative; /* promenjeno sa fixed na relative */
+    margin: 20px auto 40px; /* centrirano ispod slajda, automatski razmak */
+    bottom: auto;
+    right: auto;
+    width: 90%;
+    max-width: 320px;
+    max-height: 350px;
+    z-index: 100; /* ispod navigacije, iznad slajda */
+  }
+
+  .chatbox:not(.open) {
+    height: 40px;
+    width: 90%;
+    max-width: 240px;
+  }
+
+  .chat-body {
+    height: 250px;
   }
 }
-
-
-
 </style>
-

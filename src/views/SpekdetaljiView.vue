@@ -25,7 +25,7 @@
         <h2>Platne kartice</h2>
         <div class="platne-kartice">
           <img alt="visa" src="../assets/visa.png">
-          <img alt="master" src="../assets/master.png">
+          <img alt="master" src="..//master.png">
           <br>
           <input type="password" placeholder="Broj platne kartice" class="input-plati">
           <div class="info-kartica">

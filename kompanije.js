@@ -1,6 +1,8 @@
 /*Povezivanje NOde sa MySql*, posle toga kazemo conn .connect damo f-ju i ako nesto pukne da nam izbaci exception , time ce se server srusiti, ali znamo zasto,  ili ako je sve u redu da ispise u console connected*/
 var mysql= require("mysql");
 var express = require ("express");
+const cors = require('cors');
+
 var app = express();
 var port = 3004;
 
@@ -68,72 +70,50 @@ else{/*a ako nije undefined, u uglastoj zagradi saljemo niz stvari koje treba da
     );
 }
 });
+
+
+
+app.post("/kompanije", function(req, res){
+  const pib = req.body.kmp_pib;
+  const naziv = req.body.kmp_naziv;
+  const adresa = req.body.kmp_adresa;
+  const telefon = req.body.kmp_telefon;
+  const email = req.body.kmp_email;
+  const osoba = req.body.kmp_osoba;
+
+  console.log("Pib:", pib); 
+  console.log("Naziv:", naziv);
+  console.log("Adresa:", adresa);
+  console.log("Telefon:", telefon);  
+  console.log("Email:", email);
+  console.log("Osoba:", osoba);
+
+  // Validacija
+  if (!pib || !naziv) {
+    return res.status(400).json({ message: "PIB i naziv kompanije su obavezni!" });
+  }
+
+  conn.query(
+    "INSERT INTO kompanije SET kmp_pib=?, kmp_naziv=?, kmp_adresa=?, kmp_telefon=?, kmp_email=?, kmp_osoba=?",
+    [pib, naziv, adresa, telefon, email, osoba], 
+    function(err, results) {
+      if(err) {
+        console.error(err);
+        return res.status(500).json({ message: "Greška pri upisu kompanije" });
+      }
+
+      console.log("Kompanija dodata:", results);
+      res.json({ message: "Kompanija uspešno dodata!", id: results.insertId });
+    }
+  );
+});
+
 /*Ovo se sve zovu rest full APIJI,rest full je samo dogovor,to znaci ove putanje koje imamo npr app.get/kompanije, to su imenice i tako nam se zovu apiji, to mogu biti kompanije, proizvodi,studenti, ispiti itd..a onda u zavisnosti od metode zavisi sta radimo  Recimo GET polozeni ispiti verovatno nam vraca poloznene ispite, POST polozeni ispiti pravi neki novi polozeni ispit, PUT ILI PATCH menja neke podatke o poloznemo ispitu I DELETE brise neki polozeni ispit, TO JE SAMO DOGOVOR!*
 
 });
 /*Nakon sto smo ubacili podatke u tabelu kompanije, preko frontenda, sad treba poslati infotmacije backendu to sto smo uneli u input, ovo se inace zovu restfull APPIJI, to znaci da mi pravimo dogovor kakvu zelimo putanju da komunicira sa bazom preko koje metode i sta nam ta metoda vraca, to je ona glavna razlika izmedju GET i POST metode, GET dobijamo podatke a POST pravi podatke, npr PUT metoda mozemo iskoristiti da izmenimo podatke ali msm da u ovom trenutku za moju bazu to nece biti potrebno, mozda cu iskoristiti za proizvode kad budem kreirala prodavnicu, ako mi bude zatrebao taj deo imam na predvanju DATA ACESS /4/4 posle 2.20h, vervatno cu koristiti za tabelu proizvodi!*/
 
-app.post ("/kompanije", function(req,res){
-    /*Sad treba da primimo json, da hvatamo podatke*/
-    var pib = req.body.pib; /*dakle slacemo zahtev pod imenom pib, pod ne query nego body zahtevom, zato sto post ima body za razliku od geta koji nema, getom mozemo samo slati upite u search baru pod ? dok kod post metode to mozemo preko body*/
-    var naziv = req.body.naziv;
-    var adresa = req.body.adresa;
-    var telefon = req.body.telefon;
-    var email = req.body.email;
-    var osoba = req.body.osoba;
 
-    console.log("Pib:", pib); 
-    console.log("Naziv:", naziv);
-    console.log( "Adresa:", adresa);
-    console.log ("Telefon:", telefon);  
-    console.log ("Email:",email);
-    console.log( "Osoba:", osoba);
-
-    /* Kako uneti stvari u bazu, to ide putem upita insert, u zagradi uglastoj saljemo argumente istim redosledom koji smo u upitu insert stavili*/
-    conn.query("INSERT INTO kompanije SET kmp_pib=?, kmp_naziv=?, kmp_adresa=?, kmp_telefon=?, kmp_email=?, kmp_osoba=?",[pib, naziv, adresa, telefon, email, osoba], 
-    function(err,results,fields) {
-        if(err) throw err;
-        console.log(results);
-        /*Results nam nije toliko bitno sada, ali ono sto nam je bitno kad se sve zavrsi da vratimo rezultat*/
-        /*res.json ({"Result": "OK"});*/
-    }) ;
-
-/*Greska koja se javlja kao kl ne moze  vise poslati zahteva od jednog, to je zato sto imamo negde pogresno zatvorene zagrade u nekim kodovima ili res.json zahtev treba obrisati ako ima bespotrebno previse*/ 
-    /* Http request funkcionise tako sto posaljemo zahtev serveru i dobijemo odgovor, zato treba pozvati res json da da odgovor korisniku nakon poslatog zahtev*/
-    res.json ({"Result": "OK"});
-    /*Mi nakon poslatog zahteva post metodom ocekujemo da nam se u terminalu ispisu argumenti*/
-});
-
-
-
-
-    /*Sa bazom pricamo tako sto uzmemo konekcciju koju smo otvorili tako sto kazemo conn.query, queri ima minimum 3 argumenta, prvi argument je sql upit koji zelimo da izvrsimo, ako zelimo neke stvari da ubacimo u upit kao promenljive to bi bio drugi argument, posto mi to nemamo odmah prelazimo na treci argument a to je function koji prima 3 stvari,prima gresku ako se desila, rezulatate upita i polja, polja cemo retko koristiti! Query f-ja je asihrona, zato sto prima callback */
-   
-/*U pravom zivotu kad budemo radili upite ne smemo bacati error ovako if(err) throw err;zato sto ako se lose iskomunicira sa bazom, ceo server ce se srusiti, sto generalno ne zelimo, zelimo da to nekako vratimo korisniku  a da server nastavi da radi, u ovom trenutku ustedece nam manje zivaca jer samo mi koristimo ovaj server pa mozemo ovako bacati error*/
-
-/*Da vratimo rezultate ono sto smo dobili iz baze, dakle vracamo neki object, pod kljucem objekta vracamo results*/
- 
-/*Napravicemo jednu metodu za izmenu podataka iz baze na frontendu, metoda put*/
-
-app.put("/kompanije", function(req,res){
-    /*Da bi mogli uspesno da izmeni podatak, treba nam id, da znamo koga menjamo i od toga pocinjemo*/
-    var id = req.body.id;
-    /*Prekopiramo sve prethodne zahteve*/
-    var pib= req.body.pib;
-    var naziv = req.body.naziv;
-    var adresa = req.body.adresa;
-    var telefon = req.body.telefon;
-    var email = req.body.email;
-    var osoba = req.body.osoba;
-/*Jedina razlika je u connquery koji ce imati drugaciji upit, UMESTO INSERT UPDATE i JAKO JE VAZNO DA KAZEMO WHERE U UPITU, JER AKO NE STAVIMO, AUTOMATSKI CEMO SVE PODATKE IZ BAZE IZGUBITI, ODN SVI CE IMATI ISTI PODATAK, Dakle mnogo je vazno za DELETE I UPDATE staviti u upitu WHERE*/
-
-conn.query("UPDATE kompanije SET kmp_pib=?, kmp_naziv=?, kmp_adresa=?, kmp_telefon=?, kmp_email=?, kmp_osoba=? WHERE kmp_id=?",[pib, naziv, adresa, telefon, email, osoba, id], 
-function(err,results,fields) {
-    if(err) throw err;
-    console.log(results);
-    /*Results nam nije toliko bitno sada, ali ono sto nam je bitno kad se sve zavrsi da vratimo rezultat*/
-    res.json ({"Result": "OK"});
-}) ;
 
 /*Greska koja se javlja kao kl ne moze  vise poslati zahteva od jednog, to je zato sto imamo negde pogresno zatvorene zagrade u nekim kodovima ili res.json zahtev treba obrisati ako ima bespotrebno previse*/ 
 /* Http request funkcionise tako sto posaljemo zahtev serveru i dobijemo odgovor, zato treba pozvati res json da da odgovor korisniku nakon poslatog zahtev*/
@@ -141,7 +121,7 @@ function(err,results,fields) {
 
 
 
-});
+
 
     
 

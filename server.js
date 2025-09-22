@@ -1,50 +1,42 @@
 const express = require('express');
 const cors = require('cors');
-const mysql = require('mysql');
-const path = require('path');
-const app = express(); // Prvo se mora definisati app
+const app = express();
 
-//_dirname je putanja do foldera gde je server.js, zatim ideš u src/router/payment.js
-const paymentRoutes = require(path.join(__dirname, 'src', 'router', 'payment'));
+// Uvoz ruta
+const nalogRoutes = require('./nalog'); // rute za korisnike
+const porukeRouter = require('./poruke'); // <-- importuješ router
 
-
-
-// Omogućava CORS za sve rute
+// Middleware
 app.use(cors());
+app.use(express.json({ limit: '10mb' }));//Da se ogranici unos poruke, duzina poruke
+// Security header (opciono, može i da se isključi dok testiraš)
+//app.use((req, res, next) => {
+  /*res.setHeader(
+    'Content-Security-Policy',
+    "default-src 'self'; img-src 'self' data:; connect-src 'self'; style-src 'self'; script-src 'self';"
+  );
+  next();*/
 
-app.use((req, res, next) => {
-  res.setHeader('Content-Security-Policy', "default-src 'self'; img-src 'self' data:; connect-src 'self'; style-src 'self'; script-src 'self';");
-  next();
-});
-// Konfiguracija MySQL konekcije
-const conn = mysql.createConnection({
-  host: "localhost",
-  user: "root",
-  port: 3306, // '3306' je broj, ne treba navodnike
-  password: "root123",
-  database: "mi_baza"
-});
 
-// Provera konekcije
-conn.connect((err) => {
-  if (err) {
-    console.log("Error connecting to the database: ", err);
-  } else {
-    console.log("Connected to the database");
-  }
+// Test ruta
+app.get("/", (req, res) => {
+  res.json({ message: "Hello" });
 });
 
-// Init middleware for req.body
-app.use(express.json());
+// Rute
+app.use('/nalog', nalogRoutes);
+// koristi router
+app.use('/poruke', porukeRouter);
 
 
 
-// Definišite rute ovde (ako su potrebne)
-// app.use('/api', require('./routes/api'));
-
-// Postavljanje porta
+// Port (ili iz okruženja ili 3013)
 const PORT = process.env.PORT || 3013;
-app.use('/api', paymentRoutes);
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
 });
+
+
+//Problemi, Dupliraš MySQL konekciju.Već si napravila database.js za konekciju, a ovde u server.js opet praviš novu. To pravi konfuziju (i može da pravi greške ako koristiš različite baze, mi_baza i hemikalije_baza).👉 Rešenje: izbaci konekciju iz server.js, koristi samo database.js.Dupli cors().Imaš dva puta app.use(cors());. Nije greška, ali nepotrebno.PORT promenljiva.Definišeš i const port = 3012; i const PORT = process.env.PORT || 3013;.👉 Zadrži samo jedan (PORT sa process.env.PORT je bolja praksa).
+
+

@@ -41,7 +41,7 @@ app.get("/proizvodi", function(req, res) {
     var tpr_id = req.query.tpr_id;
 
     if (tpr_id === undefined) {
-        conn.query("SELECT proizvodi.pro_naziv FROM proizvodi JOIN proizvodi_tipoviprimene ON proizvodi.pro_id = proizvodi_tipoviprimene.pro_id", function(err, results, fields) {
+        conn.query("SELECT proizvodi.pro_iupac FROM proizvodi JOIN proizvodi_tipoviprimene ON proizvodi.pro_id = proizvodi_tipoviprimene.pro_id", function(err, results, fields) {
             if (err) {
                 console.error(err);
                 res.status(500).json({ error: 'Database query error' });
@@ -50,7 +50,7 @@ app.get("/proizvodi", function(req, res) {
             res.json({ data: results });
         });
     } else {
-        conn.query("SELECT proizvodi.pro_naziv FROM proizvodi JOIN proizvodi_tipoviprimene ON proizvodi.pro_id = proizvodi_tipoviprimene.pro_id WHERE proizvodi_tipoviprimene.tpr_id = ?", [tpr_id], function(err, results, fields) {
+        conn.query("SELECT proizvodi.pro_iupac FROM proizvodi JOIN proizvodi_tipoviprimene ON proizvodi.pro_id = proizvodi_tipoviprimene.pro_id WHERE proizvodi_tipoviprimene.tpr_id = ?", [tpr_id], function(err, results, fields) {
             if (err) {
                 console.error(err);
                 res.status(500).json({ error: 'Database query error' });
@@ -65,12 +65,13 @@ app.get("/proizvodi", function(req, res) {
 // GET metoda za prikazivanje tipova primene na osnovu pro_id
 app.get('/tipoviprimene', function(req, res) {
     const search = req.query.search;
+    //Jako vazan sql upit, da povezemo tabele da bi se pravilno pro id ucitavao
     const query = `
-      SELECT proizvodi.pro_iupac, proizvodi.pro_naziv, tipoviprimene.tpr_naziv 
-      FROM proizvodi 
-      JOIN proizvodi_tipoviprimene ON proizvodi.pro_id = proizvodi_tipoviprimene.pro_id 
-      JOIN tipoviprimene ON tipoviprimene.tpr_id = proizvodi_tipoviprimene.tpr_id 
-      WHERE proizvodi.pro_iupac LIKE ? OR proizvodi.pro_naziv LIKE ? OR tipoviprimene.tpr_naziv LIKE ?
+      SELECT p.pro_id, p.pro_iupac, t.tpr_naziv
+      FROM proizvodi p
+      JOIN proizvodi_tipoviprimene pt ON pt.pro_id = p.pro_id
+      JOIN tipoviprimene t ON t.tpr_id = pt.tpr_id
+      ORDER BY t.tpr_naziv, p.pro_iupac
     `;
     const values = [`%${search}%`, `%${search}%`, `%${search}%`];
   

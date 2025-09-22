@@ -1,4 +1,4 @@
-// Uloguj.vue
+
 <template>
 
 
@@ -14,7 +14,14 @@
         <input class="input" style="display: block;" type="password" name="password" v-model="password" autocomplete="password">
         
 
-        <button type="submit" class="button-input">Uloguj se</button>
+        <div class="login-actions">
+  <button type="submit" class="button-input">Uloguj se</button>
+  <p class="register-text">
+    Nemate nalog? 
+    <router-link to="/nalog" class="register-link">Registrujte se</router-link>
+  </p>
+</div>
+
       </form>
       <!--v-show, when assigned with false, applies display: none inline style and hides the element visually and makes almost no modifications to the DOM!!
       Unfortunately, you cannot use v-show directive because it applies only display: none style.
@@ -46,6 +53,7 @@
 
 <script>
 import axios from 'axios';
+import Swal from 'sweetalert2';
 
 
 export default {
@@ -70,44 +78,77 @@ export default {
     console.log('Odgovor od servera:', response);
     console.log('Podaci u odgovoru:', response.data);
 
-    if (response && response.data && response.status === 200) {
+    if (response?.data && response.status === 200) {
       const userData = response.data.data;
       console.log('Podaci korisnika:', userData);
 
-      if (userData.usr_id) {
+      if (userData?.usr_id) {
+        // 1) Očisti stare vrednosti, da ne bi pamtioo nazive ranijih kljuceva, kljucevi moraju biti uniformni
+        localStorage.clear();
+
+        // 2) Sačuvaj osnovne podatke korisnika
         localStorage.setItem('usr_id', userData.usr_id);
-        localStorage.setItem('fk_nar_usr_id', userData.usr_id);  // Ovde se postavlja fk_nar_usr_id
-localStorage.setItem('userEmail', userData.usr_email);  //Ne moze userData.email,  vratilo je undefinde, mora userData.usr_email    
-console.log('Korisnički ID sačuvan u localStorage.');
- // 🚀 Dodaj i naziv firme
-  if (userData.kmp_naziv) {
-    localStorage.setItem('firmaNaziv', userData.kmp_naziv);
-  } else {
-    localStorage.removeItem('firmaNaziv');
-  }
-        if (userData.usr_adresa) localStorage.setItem('userAddress', userData.kmp_adresa);
+        localStorage.setItem('userName', userData.usr_name || '');
+        localStorage.setItem('userEmail', userData.usr_email || '');
+                localStorage.setItem('userLozinka', userData.usr_password || '');
 
+        localStorage.setItem('userPhone', userData.usr_phone || '');
+        localStorage.setItem('usr_pib', userData.kmp_pib || '');
+        localStorage.setItem('usr_kompanija', userData.kmp_naziv || '');
+        localStorage.setItem('usr_adresa', userData.kmp_adresa || '');
+        localStorage.setItem('userLevel', userData.usr_level ?? 1);
+        localStorage.setItem('fk_usr_nar_id', userData.usr_id);
 
-  this.$router.push('/proizvodi');
+        console.log('Svi podaci korisnika sačuvani u localStorage.');
 
+        // 3) Ažuriraj reactive data properties da Vue odmah vidi promene
+        this.usrName = userData.usr_name || '';
+        this.usrEmail = userData.usr_email || '';
+                this.usrLozinka = userData.usr_password || '';
 
-        if (userData.fk_nar_id) {
-          localStorage.setItem('nar_id', userData.fk_nar_id);
-          console.log('ID narudžbenice sačuvan u localStorage.');
+        this.usrPhone = userData.usr_phone || '';
+        this.usrPib = userData.kmp_pib || '';
+        this.usrKompanija = userData.kmp_naziv || '';
+        this.usrAdresa = userData.kmp_adresa || '';
+
+        // Preusmeravanje sa SweetAlert potvrdom
+            Swal.fire({
+              icon: 'success',
+              title: 'Uspešna prijava',
+              text: `Dobrodošli, ${this.usrName}!`,
+              confirmButtonText: 'Nastavi'
+            }).then(() => {
+              this.$router.push('/profil');
+            });
+
+          } else {
+            console.error('Nedostaje usr_id u podacima korisnika.');
+            Swal.fire({
+              icon: 'error',
+              title: 'Greška',
+              text: 'Nedostaje ID korisnika u podacima.'
+            });
+          }
         } else {
-          localStorage.removeItem('nar_id');
-          console.log('ID narudžbenice nije prisutan, uklonjen iz localStorage ako je postojao.');
+          console.error('Prijava nije uspela ili odgovor servera nije u očekivanom formatu.');
+          Swal.fire({
+            icon: 'error',
+            title: 'Greška pri prijavi',
+            text: 'Prijava nije uspela. Proverite podatke i pokušajte ponovo.'
+          });
         }
-      } else {
-        console.error('Nedostaje usr_id u podacima korisnika.');
+      } catch (error) {
+        console.error('Greška prilikom prijave korisnika:', error);
+        Swal.fire({
+          icon: 'error',
+          title: 'Greška pri prijavi',
+          text: error.response?.data?.message || 'Došlo je do greške prilikom prijave.'
+        });
       }
-    } else {
-      console.error('Prijava nije uspela ili odgovor servera nije u očekivanom formatu.');
     }
-  } catch (error) {
-    console.error('Greška prilikom prijave korisnika:', error);
-  }
-}}}
+  }}
+//Svi podaci se čuvaju bez if-ova za proveru null vrednosti. Ako nema podatka, biće postavljeno prazno string ''.userLevel koristi ?? 1 da se osigura da običan korisnik uvek dobije level 1 ako server ne vrati vrednost.Kod je čist i čitljiv, lako se održava.
+
 </script>
 <style scoped >
 

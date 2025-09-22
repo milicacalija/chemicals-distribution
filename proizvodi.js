@@ -35,6 +35,23 @@ app.get("/",function(req,res){ /*F-je koje imaju zahteve, moraju da imaju HTTP r
     res.json({message:"Hello"})
 });
 /*Hocu da podatke prikazem sa baze na frontendu, npr tabela kompanije, komuniciramo sa appijem preko GET metode*/
+//Da se pretrazi prema piktogramu ili prema primeni
+app.get("/proizvodi/:id", function(req, res) {
+  const id = req.params.id;
+  const query = `
+    SELECT proizvodi.*, specifikacije.*
+    FROM proizvodi
+    JOIN specifikacije ON proizvodi.pro_id = specifikacije.fk_spe_pro_id
+    WHERE proizvodi.pro_id = ?;
+  `;
+  conn.query(query, [id], function(err, results) {
+    if (err) return res.status(500).send(err);
+    if (results.length === 0) return res.status(404).send({ message: "Proizvod nije pronađen" });
+    res.json(results[0]);
+  });
+});
+
+
 
 app.get("/proizvodi", function(req,res){
      /*Sad treba napraviti filter, search bar, npr ako unese korisnik er da mu prikaze sve sto sadrzi er, to se postize putem upita WHERE*/
@@ -67,70 +84,57 @@ conn.query(query, ["%" + search + "%", "%" + search + "%"], function (err, resul
 });
 }
 });
-app.get("/proizvodi/:id", (req, res) => {
-    const productId = req.params.id;
-    const query = `
-        SELECT proizslike.*, proizvodi.pro_iupac
-        FROM proizslike
-        JOIN proizvodi ON proizslike.prs_id = proizvodi.fk_prslike
-        WHERE proizvodi.pro_id = ?
-        
-    `;
 
-    conn.query(query, [productId], (err, results) => {
-        if (err) {
-            console.error("Error executing query:", err);
-            res.status(500).json({ error: "Database query error" });
-            return;
-        }
 
-        results.forEach(row => {
-            if (row.str_blob && row.prs_blob) {
-                try {
-                    //Da bi iz baze slike povukao na pdf
-row.str_image = `data:image/jpeg;base64,${Buffer.from(row.str_blob).toString('base64')}`;                    row.prs_image = `data:image/jpeg;base64,${Buffer.from(row.prs_blob).toString('base64')}`;
-                    delete row.str_blob;
-                    delete row.prs_blob;
-                } catch (conversionError) {
-                    console.error("Error converting BLOB to Base64:", conversionError);
-                    res.status(500).json({ error: "Conversion error" });
-                    return;
-                }
-            }
-        });
 
-        res.json({ data: results });
-    });
-});
+       
+            
+            
+
 
 /*Nakon sto smo ubacili podatke u tabelu kompanije, preko frontenda, sad treba poslati infotmacije backendu to sto smo uneli u input, ovo se inace zovu restfull APPIJI, to znaci da mi pravimo dogovor kakvu zelimo putanju da komunicira sa bazom preko koje metode i sta nam ta metoda vraca, to je ona glavna razlika izmedju GET i POST metode, GET dobijamo podatke a POST pravi podatke, npr PUT metoda mozemo iskoristiti da izmenimo podatke ali msm da u ovom trenutku za moju bazu to nece biti potrebno, mozda cu iskoristiti za proizvode kad budem kreirala prodavnicu, ako mi bude zatrebao taj deo imam na predvanju DATA ACESS /4/4 posle 2.20h, vervatno cu koristiti za tabelu proizvodi!*/
-
-app.post ("/proizvodi", function(req,res){
-    console.log("📥 Request body:", req.body);
-    /*Sad treba da primimo json, da hvatamo podatke da ne bismo pisali var iupac ...var cena , var kolicina sve to mozemo skraceno zapisatin kao const*/
-
-        const { iupac, cena, kolicina, jedinicamere, rok, lager } = req.body;
-            console.log(iupac, cena, kolicina, jedinicamere, rok, lager);
+app.post("/proizvodi", function(req, res) {
+  console.log("📥 Request body:", req.body);
 
 
+  //Ovaj pristup:koristi INSERT INTO ... (kolone) VALUES (?, ?, ...) umesto SET (često je manje problematično).eksplicitno parsira tipove (parseInt, parseFloat) → sprečava greške tipa “Incorrect decimal value”.ignoriše kolone pro_id, fk_usr_id, fk_stv_id → jer se one dodaju kasnije ili su auto-increment / nullable.
 
-/* Kako uneti stvari u bazu, to ide putem upita insert, u zagradi uglastoj saljemo argumente istim redosledom koji smo u upitu insert stavili*/
-conn.query("INSERT INTO proizvodi SET pro_iupac=?, pro_cena=?, pro_kolicina=?, pro_jedinicamere=?, pro_rok=?, pro_lager=?" ,[ iupac, cena, kolicina, jedinicamere, rok, lager], 
-function(err,results,fields) {
-    if(err) throw err;
-                console.error("❌ Greška u INSERT upitu:", err);    /*Results nam nije toliko bitno sada, ali ono sto nam je bitno kad se sve zavrsi da vratimo rezultat*/
-    /*res.json ({"Result": "OK"});*/
-}) ;
-                return res.status(500).json({ error: "Greška pri upisu u bazu" });
+  const sql = `
+  INSERT INTO proizvodi 
+    (pro_iupac, pro_cena, pro_kolicina, pro_jedinicamere, pro_rok, pro_lager, tip_hemikalije)
+  VALUES (?, ?, ?, ?, ?, ?, ?)
+`;
+
+const { iupac, cena, kolicina, jedinicamere, rok, lager, tip } = req.body;
+
+const values = [
+  iupac,
+  parseFloat(cena),      // decimal
+  parseInt(kolicina),    // int
+  jedinicamere,
+  parseInt(rok),
+  parseInt(lager),
+  tip
+];
+
+conn.query(sql, values, (err, result) => {
+  if (err) {
+    console.error("❌ Greška u INSERT upitu:", err);
+    return res.status(500).json({ error: "Greška pri upisu u bazu" });
+  }
+  res.json({ message: "Proizvod uspešno dodat", id: result.insertId });
+});
+});
+
                 
-
+ /*Results nam nije toliko bitno sada, ali ono sto nam je bitno kad se sve zavrsi da vratimo rezultat*/
 
 
 /*Greska koja se javlja kao kl ne moze  vise poslati zahteva od jednog, to je zato sto imamo negde pogresno zatvorene zagrade u nekim kodovima ili res.json zahtev treba obrisati ako ima bespotrebno previse*/ 
     /* Http request funkcionise tako sto posaljemo zahtev serveru i dobijemo odgovor, zato treba pozvati res json da da odgovor korisniku nakon poslatog zahtev*/
-    res.json ({"Result": "OK"});//ovo je prerano Ti sada vraćaš res.json({"Result":"OK"}) odmah posle conn.query, ali query radi asinhrono.To znači: Express šalje odgovor pre nego što se INSERT završi, i ako još jednom pokušaš poslati res.json iz callback-a → dobićeš grešku Cannot set headers after they are sent.
+   /* res.json ({"Result": "OK"});//ovo je prerano Ti sada vraćaš res.json({"Result":"OK"}) odmah posle conn.query, ali query radi asinhrono.To znači: Express šalje odgovor pre nego što se INSERT završi, i ako još jednom pokušaš poslati res.json iz callback-a → dobićeš grešku Cannot set headers after they are sent.
     /*Mi nakon poslatog zahteva post metodom ocekujemo da nam se u terminalu ispisu argumenti//Treba da šalješ odgovor unutra u callbacku, nakon što se query uspešno izvrši:*/
-});
+
 
 
     /*Sa bazom pricamo tako sto uzmemo konekcciju koju smo otvorili tako sto kazemo conn.query, queri ima minimum 3 argumenta, prvi argument je sql upit koji zelimo da izvrsimo, ako zelimo neke stvari da ubacimo u upit kao promenljive to bi bio drugi argument, posto mi to nemamo odmah prelazimo na treci argument a to je function koji prima 3 stvari,prima gresku ako se desila, rezulatate upita i polja, polja cemo retko koristiti! Query f-ja je asihrona, zato sto prima callback */
@@ -157,9 +161,11 @@ var kolicina = req.body.kolicina;
 var jedinicamere = req.body.jedinicamere;
 var rok = req.body.rok;
 var lager = req.body.lager;
+var tip = req.body.tip;
+
 /*Jedina razlika je u connquery koji ce imati drugaciji upit, UMESTO INSERT UPDATE i JAKO JE VAZNO DA KAZEMO WHERE U UPITU, JER AKO NE STAVIMO, AUTOMATSKI CEMO SVE PODATKE IZ BAZE IZGUBITI, ODN SVI CE IMATI ISTI PODATAK, Dakle mnogo je vazno za DELETE I UPDATE staviti u upitu WHERE*/
 
-conn.query("UPDATE proizvodi SET pro_naziv=?, pro_iupac=?, pro_cena=?, pro_kolicina=?, pro_jedinicamere=?, pro_rok=?, pro_lager=? WHERE pro_id=?", [naziv, iupac, cena, kolicina, jedinicamere, rok, lager, id], 
+conn.query("UPDATE proizvodi SET  pro_iupac=?, pro_cena=?, pro_kolicina=?, pro_jedinicamere=?, pro_rok=?, pro_lager=? tip_hemikalije=? WHERE pro_id=?", [naziv, iupac, cena, kolicina, jedinicamere, rok, lager, tip, id], 
 
 function(err,results,fields) {
     if(err) throw err;

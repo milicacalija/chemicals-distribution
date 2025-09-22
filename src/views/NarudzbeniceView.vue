@@ -4,14 +4,12 @@
         <Narudzbenice> </Narudzbenice>
     
     
-        <div class="kontakt-forma">
     
          
-                  
     
         
          
-    <br>
+    
     
           
     
@@ -28,7 +26,7 @@
     </div>
     
     </div>
-    </div>
+    
     
     
     </template>

@@ -1,84 +1,115 @@
 <template>
-    <div>
-      <div class="nav">
-        <div class="container">
-            <!-- Logo unutar navigacionog bara,  //Ako želiš da tekst bude gore u krugu, a slika ispod teksta, najbolje je da koristiš flex sa flex-direction: column i malo razmaka. -->
-        
-            <br>
-            <div class="nav-links">
-                <div class="logo-header">
-          
-  <p class="logo-text">CHEMICALS</p>
-  <img src="@/assets/chemical.png" alt="Chemical Logo" class="logo" />
-</div>
-              
-   
-            
-          
-        
-    
-              <a href="/proizvodi">Hemikalije</a>
-              <a href="/primena">Primena</a>
-              <a href="/kontakt">Kontakt</a>
-              <a href="/uloguj">Uloguj se</a>
-              <a href="/nalog">Kreiraj nalog</a>
-              <div class="dropdown">
-            
-              <address>
-          <img alt="mail" src="../assets/mail.png">
-          <a href="mailto:chemicals@chemistry.com">
-            <span class="address">chemicals@chemistry.com</span>
-          </a>
-          <br>
-          <img alt="phone" src="../assets/phone.png">
-          <a href="tel:+381659600516">
-            <span class="address">+381-65 9600-516</span>
-          </a>
-        </address>
-            </div>
+  <div>
+    <!-- Navigacioni bar -->
+    <div class="nav">
+      <div class="container">
+        <div class="nav-links">
+
+          <!-- Logo -->
+          <div class="logo-header">
+            <p class="logo-text">CHEMICALS</p>
+            <img src="@/assets/chemical.png" alt="Chemical Logo" class="logo" />
           </div>
+
+          <!-- Glavna navigacija -->
+          <router-link to="/proizvodi">Hemikalije</router-link>
+          <router-link to="/primena">Primena</router-link>
+                    <router-link to="/piktogrami">Piktogrami</router-link>
+
+          <router-link to="/kontakt">Kontakt</router-link>
+
+          <!-- Linkovi za neulogovanog korisnika -->
+          <template v-if="!isLoggedIn">
+            <router-link to="/uloguj">Uloguj se</router-link>
+            <router-link to="/nalog">Kreiraj nalog</router-link>
+          </template>
+
+
+           <!-- Ako je ulogovan običan korisnik -->
+          <template v-else-if="!isAdmin">
+            <router-link to="/profil">Moj profil ({{ usrName }})</router-link>
+          </template>
+          
+
+
+          <!-- Link za admina, Da, tačno – ako u localStorage već postoji userLevel = 0 i usr_id, Vue misli da si admin i zato prikazuje Admin panel i ne pokazuje linkove za “Uloguj se / Kreiraj nalog”. kad se obrise local storage Sjajno! 🎉 Super što sada sve funkcioniše kako treba — običan korisnik vidi Moj profil (ime), neulogovan vidi Uloguj se / Kreiraj nalog, a admin će videti svoj Admin panel kad se uloguje.
+
+Da očistiš localStorage i testiraš različite scenarije: -->
+          <router-link v-if="isAdmin" to="/admin">Admin panel</router-link>
+
+          <!-- Kontakt info -->
+          <div class="dropdown">
+            <address>
+              <img alt="mail" src="../assets/mail.png" />
+              <a href="mailto:chemicals@chemistry.com">
+                <span class="address">chemicals@chemistry.com</span>
+              </a>
+              <br>
+              <img alt="phone" src="../assets/phone.png" />
+              <a href="tel:+381659600516">
+                <span class="address">+381-65 9600-516</span>
+              </a>
+            </address>
+          </div>
+
         </div>
-      </div>
-                  
-            
- 
-  
-  
-      <div class="slideshow-container">
-  <div class="slideshow" ref="slideshow">
-    <div class="slide" v-for="(slide, index) in slides" :key="index">
-      <div class="slide-content">
-        <h2 class="slide-title">{{ slide.title }}</h2>
-        <p class="slide-text">{{ slide.text }}</p>
       </div>
     </div>
-  
-          <!-- Dugme za prelazak na prethodni slajd -->
-          <button class="prev" @click="prevSlide">&#10094;</button>
-          <!-- Dugme za prelazak na sledeći slajd -->
-          <button class="next" @click="nextSlide">&#10095;</button>
+
+    <!-- Slideshow -->
+    <div class="slideshow-container">
+      <div class="slideshow" ref="slideshow">
+        <div class="slide" v-for="(slide, index) in slides" :key="index">
+          <div class="slide-content">
+            <h2 class="slide-title">{{ slide.title }}</h2>
+            <p class="slide-text">{{ slide.text }}</p>
+          </div>
         </div>
+
+        <!-- Dugmad za prelazak slajdova -->
+        <button class="prev" @click="prevSlide">&#10094;</button>
+        <button class="next" @click="nextSlide">&#10095;</button>
       </div>
-   
-      <div id="footer">
-        <div class="container">
-          <div class="footer-text"></div>
-        </div>
-        <span class="address-footer">Jurija Gagarina 36, 11070, Novi Beograd</span>
-       
-        <br>
-        <span class="address">Personal Data Protection<br>Cookie Policy</span>
-      </div> </div>
-  
-     
-  </template>
+    </div>
+
+    <!-- Footer -->
+    <div id="footer">
+      <div class="container">
+        <div class="footer-text"></div>
+      </div>
+      <span class="address-footer">Jurija Gagarina 36, 11070, Novi Beograd</span>
+      <br>
+      <span class="address">Personal Data Protection<br>Cookie Policy</span>
+    </div>
+
+  </div>
+</template>
+
   
 
  <script>
 export default {
   name: "Home",
+computed: {
+    isLoggedIn() {
+      return !!localStorage.getItem('usr_id');
+    },
+    //Ako u localStorage nije postavljen userLevel, localStorage.getItem('userLevel') vraća null. Number(null) daje 0 u JavaScript-u! 🔑To znači da Vue misli da si admin čak i kada nisi ulogovana. Zato link Admin panel uvek prikazuje, dodajem proveru da se vidi da li je uopste korisnik ulogovan,pre nego sto vidimo da li je admin
+    isAdmin() {
+  const userLevel = localStorage.getItem('userLevel');
+  const usrId = localStorage.getItem('usr_id');
+  return usrId && Number(userLevel) === 0;
+},
+    usrName() {
+      return localStorage.getItem('userName') || '';
+    }
+  },
+
+   
   data() {
     return {
+      
+            showSlideshow: true,
         //Ne možeš primeniti CSS direktno na JS objekat (slides), jer CSS radi samo sa HTML elementima.Ključ je renderovati te objekte u HTML (putem v-for ili map funkcije) i dodeliti im klase.Nakon toga jedan CSS stil može da važi za sve slide-ove istovremeno.
       currentIndex: 0,
       slides: [
@@ -113,11 +144,14 @@ export default {
       this.updateSlidePosition();
     },
     updateSlidePosition() {
-      const slideshow = this.$refs.slideshow;
-      slideshow.style.transform = `translateX(-${this.currentIndex * 100}%)`;
-    }
+  const slideshow = this.$refs.slideshow;
+  if (!slideshow) return; // ako još nije renderovan, izađi
+  slideshow.style.transform = `translateX(-${this.currentIndex * 100}%)`;
+}
   },
   mounted() {
+//Ah, sada je jasno zašto dobijaš “can't access property 'style', slideshow is undefined” Problem je u Vue2 ref i renderovanju sa v-if / v-for`:Tvoja funkcija updateSlidePosition() koristi this.$refs.slideshow.Ako this.$refs.slideshow još nije renderovan u DOM-u (npr. v-if="showSlideshow" je false), onda je this.$refs.slideshow undefined.Zato dobijaš grešku kada pokušavaš slideshow.style.transform.
+        this.showSlideshow = false; // sakrijemo kada komponenta mount-uje
      // Obezbedite da je referenca na slideshow dostupna pre nego što pozovete updateSlidePosition
      this.$nextTick(() => {
       this.updateSlidePosition(); // Postavite početni položaj slajdova
@@ -327,6 +361,51 @@ export default {
 
 .next {right: 20px; /* Razmak od desne ivice */
 }
+/* Responsive za mobilne telefone */
+@media (max-width: 768px) {
+ .slide {
+  display: flex;
+  justify-content: flex-start;
+  align-items: center;
+  text-align: left;
+  
+  /* Nema fiksne visine */
+  width: 100%;
+  aspect-ratio: 16 / 9; /* održava proporciju slike */
+  
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  
+  padding-left: 50px;
+  position: relative;
+  color: white;
+}
+  .slide-title {
+    font-size: 22px;
+  }
+  .slide-text {
+    font-size: 14px;
+    max-width: 90%;
+  }
+  .slide-content {
+    max-width: 95%;
+    padding: 10px;
+  }
+
+  .logo-text {
+    font-size: 24px;
+  }
+  .nav-links {
+    flex-direction: column;
+    gap: 10px;
+    margin-right: 10px;
+  }
+  .nav-links a {
+    font-size: 14px;
+  }
+}
+
 
 
 </style>

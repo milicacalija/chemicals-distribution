@@ -3,6 +3,7 @@ var mysql= require("mysql");
 var express = require ("express");
 var app = express();
 var port = 3006;
+const moment = require('moment-timezone'); // za Node.js
 
 app.use(express.json());
 app.use((req,res,next)=>{/*Ovaj app nam sluzi da mozemo pristupamo preko AJAX, tri hedera koja kazu browseru da sme da se obrati sa bilo kog Origin, sa bilo kog domena to znaci ova zvezdica u zagradi
@@ -36,7 +37,83 @@ app.get("/",function(req,res){ /*F-je koje imaju zahteve, moraju da imaju HTTP r
     res.json({message:"Hello"})
 });
 /*Hocu da podatke prikazem sa baze na frontendu, npr tabela kompanije, komuniciramo sa appijem preko GET metode*/
+//GET poslednja 2 korisnika za admina
+app.get("/admin/users", (req, res) => {
+  const query = `
+   SELECT 
+      users.usr_id,
+      users.usr_name,
+      users.usr_email,
+      users.usr_level,
+      narudzbenice.nar_id,
+      narudzbenice.nar_datum,
+      narudzbenice.nar_cena,
+      stavke.stv_id,
+      stavke.fk_stv_pro_id,
+      stavke.stv_kolicina,
+      stavke.uk_stv_cena,
+      proizvodi.pro_iupac
+    FROM users
+    LEFT JOIN narudzbenice ON narudzbenice.fk_nar_usr_id = users.usr_id
+    LEFT JOIN stavke ON stavke.fk_stv_nar_id = narudzbenice.nar_id
+    LEFT JOIN proizvodi ON proizvodi.pro_id = stavke.fk_stv_pro_id
+    ORDER BY users.usr_id, narudzbenice.nar_id;
+  `;
+//Ah, to objašnjava zašto si dobijala “0” u frontend-u ako si koristila Number() ili nešto slično na JS strani — DECIMAL iz MySQL vraća string, ne broj.
+  
 
+  conn.query(query, (err, results) => {
+    if (err) {
+        results.forEach(r => console.log(r.nar_id, r.nar_cena));
+      console.error("SQL greška:", err);
+      return res.status(500).json({ error: err });
+    }
+
+      const usersMap = {};
+    results.forEach(row => {
+            // Kreiraj korisnika ako ne postoji
+      if (!usersMap[row.usr_id]) {
+        usersMap[row.usr_id] = {
+          usr_id: row.usr_id,
+          usr_name: row.usr_name,
+          usr_email: row.usr_email,
+          usr_level: row.usr_level,
+          narudzbenice: []
+        };
+      }
+          // Kreiraj narudžbenicu samo ako postoji nar_id
+       if (row.nar_id) {
+        let narudzbenica = usersMap[row.usr_id].narudzbenice.find(n => n.nar_id === row.nar_id);
+        if (!narudzbenica) {
+          narudzbenica = {
+            nar_id: row.nar_id,
+            nar_datum: row.nar_datum ? moment(row.nar_datum).tz('Europe/Belgrade').format('YYYY-MM-DD HH:mm:ss') : null,
+  nar_cena: parseFloat(row.nar_cena), // <-- ovde parsiraš string u broj   
+  //Stavke su bile upsane kao komentar zato sam imala problem sa greskom undefined push....pronadji u fajlu        
+  stavke: []
+          };
+          usersMap[row.usr_id].narudzbenice.push(narudzbenica);
+        }
+
+// Ovo proverava da li narudzbenica postoji pre push
+  if (row.stv_id && narudzbenica) {
+              narudzbenica.stavke.push({
+            stv_id: row.stv_id,
+            fk_stv_pro_id: row.fk_stv_pro_id,
+            stv_kolicina: row.stv_kolicina,
+            uk_stv_cena: row.uk_stv_cena,
+            pro_iupac: row.pro_iupac,
+          });
+        }
+      }
+    });
+
+    res.json(Object.values(usersMap));
+
+   
+   // evo glreske vPrvo šalješ res.json(Object.values(usersMap)).Zatim pokušavaš da radiš JSON.parse na u.narudzbenice koje nije JSON string, pa baca grešku Unexpected token u.I pokušavaš da šalješ res.json dvaput, što ne može u Expressu – prvi res.json već završava odgovor.Tačno ✅ – nema potrebe za JSON.parse, jer narudzbenice više nisu JSON string, već normalan niz objekata nakon što ih složiš u usersMap.
+  });
+});
 app.get("/users", function(req,res){
 
     /*Sad treba napraviti filter, search bar, npr ako unese korisnik er da mu prikaze sve sto sadrzi er, to se postize putem upita WHERE*/

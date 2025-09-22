@@ -1,0 +1,416 @@
+/* ========================
+   Osnovni stilovi
+======================== */
+body {
+  font-family: Arial, sans-serif;
+  margin: 0;
+  padding: 0;
+}
+
+h3 {
+  text-align: center;
+}
+
+img {
+  display: block;
+  margin: 0 auto;
+}
+
+/* ========================
+   Proizvodi
+======================== */
+.product-wrapper {
+  display: flex;
+  align-items: flex-start;
+  gap: 20px;
+  margin-top: 20px;
+}
+
+.selected-proizvod {
+  flex: 0 0 250px;
+  text-align: center;
+}
+
+.proizvod-slika {
+  width: 300px;
+  height: 300px;
+  margin-top: 20px;
+}
+
+.input {
+  width: 300px;
+  height: 30px;
+  border-radius: 20px;
+}
+
+/* ========================
+   Tabele i tooltip
+======================== */
+.table-container {
+  margin: 20px auto;
+  width: 100%;
+  overflow-x: auto;
+}
+
+table {
+  width: 100%;
+  max-width: 1200px;
+  border-collapse: collapse;
+  table-layout: fixed;
+}
+
+th, td {
+  border: 1px solid #762e2e;
+  padding: 8px;
+  text-align: center;
+  word-wrap: break-word;
+  height: 30px;
+}
+
+th {
+  background-color: #641515;
+  color: white;
+  font-weight: bold;
+}
+
+td {
+  background-color: #fff;
+  color: #000;
+  text-align: left;
+}
+
+tbody tr:hover {
+  background-color: #ccc0c0;
+}
+
+.tooltip-container {
+  position: relative;
+  cursor: pointer;
+  text-decoration: underline dotted;
+}
+
+.tooltip-content {
+  display: none;
+  position: absolute;
+  top: 100%;
+  left: 0;
+  background-color: rgba(100,21,21,0.95);
+  color: #fff;
+  padding: 10px;
+  border-radius: 6px;
+  min-width: 200px;
+  max-width: 90%;
+  max-height: 300px;
+  overflow-y: auto;
+  z-index: 1000;
+}
+
+.tooltip-container:hover .tooltip-content {
+  display: block;
+}
+
+/* ========================
+   Ikona korpe i brojač
+======================== */
+.cart-icon {
+  position: fixed;
+  top: 10px;
+  right: 10px;
+  z-index: 1000;
+}
+
+.cart-icon img {
+  width: 60px;
+  height: 60px;
+}
+
+.cart-count {
+  position: absolute;
+  top: 0;
+  right: 0;
+  background: red;
+  color: white;
+  border-radius: 50%;
+  width: 20px;
+  height: 20px;
+  text-align: center;
+  font-weight: bold;
+  font-size: 12px;
+}
+
+/* ========================
+   Popup / side drawer korpa
+======================== */
+.cart-overlay {
+  display: none; /* prikazujemo samo na mobilnom kada se otvori korpa */
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0,0,0,0.5);
+  z-index: 1500;
+}
+
+.cart-popup {
+  position: fixed;
+  top: 0;
+  right: 0;
+  height: 100vh;
+  width: 400px;
+  max-width: 90%;
+  background: #fff;
+  border-left: 2px solid #641515;
+  box-shadow: -4px 0 15px rgba(0,0,0,0.3);
+  display: flex;
+  flex-direction: column;
+  z-index: 2000;
+  overflow-y: auto;
+  animation: slideInRight 0.3s ease-out;
+}
+
+@keyframes slideInRight {
+  from { transform: translateX(100%); }
+  to { transform: translateX(0); }
+}
+
+/* Korpa header */
+.cart-popup-header {
+  background: #641515;
+  color: white;
+  padding: 12px 16px;
+  font-size: 16px;
+  font-weight: bold;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.cart-popup-header button {
+  background: transparent;
+  border: none;
+  color: white;
+  font-size: 18px;
+  cursor: pointer;
+}
+
+/* Lista stavki */
+.cart-popup-body {
+  flex: 1;
+  padding: 10px 15px;
+}
+
+.cart-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+  border-bottom: 1px solid #eee;
+  padding-bottom: 8px;
+}
+
+.cart-item-info {
+  font-size: 14px;
+  flex: 1;
+}
+
+/* Footer */
+.cart-popup-footer {
+  padding: 12px 16px;
+  border-top: 1px solid #eee;
+  text-align: center;
+}
+
+.cart-popup-footer button {
+  width: 100%;
+  background: #641515;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  padding: 10px;
+  font-size: 15px;
+  font-weight: bold;
+  cursor: pointer;
+  transition: background 0.3s;
+}
+
+.cart-popup-footer button:hover {
+  background: #4b0f0f;
+}
+
+/* ========================
+   Dugmad
+======================== */
+.add-korpa, .logout-btn, .cart-popup button {
+  width: 150px;
+  padding: 10px;
+  border-radius: 5px;
+  background-color: #641515;
+  color: white;
+  font-size: 16px;
+  cursor: pointer;
+  text-align: center;
+  border: none;
+  transition: background-color 0.3s, transform 0.2s;
+}
+
+.add-korpa:hover {
+  background-color: #2a1564;
+}
+
+.add-korpa:active {
+  transform: scale(0.98);
+}
+
+.logout-btn {
+  display: block;
+  margin: 20px auto;
+}
+/* Korpa je sakrivena po defaultu */
+.cart-popup {
+  display: none;
+}
+
+/* Kada je showCartPopup = true → prikazuje se kao side drawer */
+.cart-popup.show {
+  display: flex;
+}
+
+
+/* ========================
+   Responsive stilovi
+======================== */
+@media (max-width: 768px) {
+  .product-wrapper {
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .selected-proizvod {
+    width: 100%;
+  }
+
+  .proizvod-slika {
+    width: 80%;
+    height: auto;
+  }
+
+  .input {
+    width: 90%;
+  }
+
+  table {
+    font-size: 12px;
+  }
+
+  th, td {
+    padding: 6px;
+  }
+
+  .table-container {
+    overflow-x: auto;
+  }
+
+  .cart-popup {
+    width: 90%;
+  }
+
+
+  /* Overlay za tamnjenje pozadine */
+  @media (max-width: 768px) {
+  @media (max-width: 768px) {
+  .cart-overlay {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0,0,0,0.5);
+    z-index: 1500;
+  }
+
+  .cart-popup {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 90%;
+    max-width: 400px;
+    background: white;
+    border-radius: 12px;
+    z-index: 2000;
+    display: none;
+    flex-direction: column;
+    padding: 20px;
+  }
+
+  /* Kada je showCartPopup=true */
+  .cart-popup.show,
+  .cart-overlay.show {
+    display: block;
+  }
+}
+  /* Animacija za otvaranje korpe */
+  @keyframes slideUp {
+    from { transform: translateY(100%); }
+    to { transform: translateY(0); }
+  }
+
+  /* Header korpe */
+  .cart-popup-header {
+    padding: 12px 16px;
+    font-size: 16px;
+    font-weight: bold;
+    background: #641515;
+    color: white;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-top-left-radius: 15px;
+    border-top-right-radius: 15px;
+  }
+
+  /* Footer dugme za kupovinu */
+  .cart-popup-footer button {
+    width: 90%;
+    margin: 10px auto;
+    padding: 12px;
+    font-size: 1em;
+  }
+
+  /* Stavke korpe */
+  .cart-popup-body {
+    padding: 10px 15px;
+    flex: 1;
+    overflow-y: auto;
+  }
+
+  /* Stavke sa malo više prostora */
+  .cart-item {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 5px;
+    padding: 8px 0;
+    border-bottom: 1px solid #eee;
+  }
+
+  .cart-item-info {
+    width: 100%;
+    display: flex;
+    justify-content: space-between;
+  }
+
+  .quantity-container {
+    justify-content: flex-start;
+    gap: 10px;
+  }
+}
+
+  .add-korpa, .logout-btn, .cart-popup button {
+    width: 80%;
+    font-size: 1em;
+    padding: 12px;
+  }
+}

@@ -1,0 +1,18 @@
+FROM node:20
+
+WORKDIR /app
+
+# Kopira package.json i package-lock.json
+COPY package*.json ./
+
+# Instalira zavisnosti
+RUN npm install
+
+# Kopira sve fajlove
+COPY . .
+
+# Otvara port koji backend koristi
+EXPOSE 3000
+
+# Komanda za pokretanje servera
+CMD ["npm", "start"]

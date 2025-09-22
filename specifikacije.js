@@ -3,7 +3,7 @@ var mysql= require("mysql");
 var express = require ("express");
 var app = express();
 var port = 3010;
-
+//renutno koristiš mysql.createConnection i onda ga eksportuješ (module.exports = conn) i koristiš ga u više ruta (/specifikacije GET, POST, PUT, DELETE).To u startu radi, ali čim ti frontend pošalje više upita skoro u isto vreme, Node koristi istu konekciju za sve, i tada puca sa onom greškom:
 app.use(express.json());
 app.use((req,res,next)=>{/*Ovaj app nam sluzi da mozemo pristupamo preko AJAX, tri hedera koja kazu browseru da sme da se obrati sa bilo kog Origin, sa bilo kog domena to znaci ova zvezdica u zagradi
  Zatimsa bilo koje metode moze da se obrati u zagradi su navdene metode

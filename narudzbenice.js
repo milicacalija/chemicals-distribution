@@ -1,5 +1,6 @@
 //de generisati PDFNe u mixin.js – mixin.js je frontend (Vue) i nema pristup serveru, bazama i SMTP.PDF i slanje mejla mora ići preko backend-a, npr. u narudzbenice.js ili posebnom fajlu za mail/PDF.Razlog: samo backend ima:pristup bazi da dobije stavke narudžbine,mogućnost da šalje mail preko SMTP-a,mogućnost da generiše i sačuva PDF.
 
+//2️⃣ Backend ne sme da koristi axios.post prema samom sebi, axios je za frontend
 
 //Ne, POST je u potpunosti ispravan za ubacivanje stavki u bazu. Evo zašto:POST se koristi kada pravimo novi resurs na serveru, što je upravo tvoj slučaj:Kreiraš novu narudžbenicu u narudzbenice.Ubacuješ nove stavke u stavke.PUT se obično koristi za izmenu postojećeg resursa:Ako bi menjao već postojeću narudžbenicu ili njene stavke, tada bi PUT bio ispravan.Dakle:POST /narudzbenice → kreira novu narudžbenicu i stavke.PUT /narudzbenice/:id → menja narudžbenicu ili njene podatke.
 
@@ -13,7 +14,6 @@ const fs = require("fs");
     const path = require('path');
 
 const nodemailer = require('nodemailer');
-const sgMail = require('@sendgrid/mail');
 const cors = require('cors'); // <---- OVO DODAJES
 
 // Inicijalizacija aplikacije
@@ -75,28 +75,70 @@ app.get("/",function(req,res){ /*F-je koje imaju zahteve, moraju da imaju HTTP r
 // Dohvatanje svih narudžbenica sa podacima o korisniku
 app.get('/narudzbenice', (req, res) => {
     const query = `
-        SELECT narudzbenice.*, users.usr_email AS email, users.usr_name AS name 
-        FROM narudzbenice 
-        JOIN users ON narudzbenice.fk_nar_usr_id = users.usr_id
-        JOIN stavke  ON stavke.fk_stv_nar_id = narudzbenice.nar_id
-    JOIN proizvodi  ON proizvodi.pro_id = stavke.fk_stv_pro_id
-    LEFT JOIN proizslike  ON proizslike.fk_prs_pro_id = proizvodi.pro_id
-    `;
+        SELECT 
+      narudzbenice.nar_id,
+      narudzbenice.nar_datum,
+      narudzbenice.nar_cena,
+      users.usr_id,
+      users.usr_name,
+      users.usr_email,
+      stavke.stv_id,
+      stavke.fk_stv_pro_id,
+      stavke.stv_kolicina,
+      stavke.uk_stv_cena,
+      proizvodi.pro_iupac,
+      proizvodi.pro_naziv
+    FROM narudzbenice 
+    JOIN users ON narudzbenice.fk_nar_usr_id = users.usr_id
+    JOIN stavke ON stavke.fk_stv_nar_id = narudzbenice.nar_id
+    JOIN proizvodi ON proizvodi.pro_id = stavke.fk_stv_pro_id
+    LEFT JOIN proizslike ON proizslike.fk_prs_pro_id = proizvodi.pro_id
+    ORDER BY narudzbenice.nar_id;
+  `;
+
+    
     conn.query(query, (err, results) => {
         if (err) {
             console.error('Greška prilikom dohvaćanja narudžbenica:', err);
             return res.status(500).json({ error: 'Greška prilikom dohvaćanja narudžbenica' });
         }
-        
+       // Grupisanje po narudzbenici
+const narudzbeniceMap = {};
+results.forEach(row => {
+  // Samo ako narudzbenica postoji
+  if (row.nar_id) {
+    if (!narudzbeniceMap[row.nar_id]) {
+      narudzbeniceMap[row.nar_id] = {
+        nar_id: row.nar_id,
+        nar_datum: row.nar_datum ? moment(row.nar_datum).tz('Europe/Belgrade').format('YYYY-MM-DD HH:mm:ss') : null,
+        nar_cena: row.nar_cena || 0,
+        user: {
+          usr_id: row.usr_id,
+          usr_name: row.usr_name,
+          usr_email: row.usr_email,
+        },
+        stavke: []
+      };
+    }
 
-        // Konvertuj datume u Europe/Belgrade
-        results.forEach(order => {
-            order.nar_datum = moment(order.nar_datum).tz('Europe/Belgrade').format('YYYY-MM-DD HH:mm:ss');
-        });
-
-        res.json(results);
-    });
+    // Samo ako stavka postoji
+    if (row.stv_id) {
+      narudzbeniceMap[row.nar_id].stavke.push({
+        stv_id: row.stv_id,
+        fk_stv_pro_id: row.fk_stv_pro_id,
+        stv_kolicina: row.stv_kolicina,
+        uk_stv_cena: row.uk_stv_cena,
+        pro_iupac: row.pro_iupac,
+      });
+    }
+  }
 });
+
+res.json(Object.values(narudzbeniceMap));
+
+});
+});
+        
 /*Hocu da podatke prikazem sa baze na frontendu, npr tabela kompanije, komuniciramo sa appijem preko GET metode*/
 
 app.get('/narudzbenice/:nar_id', (req, res) => {
@@ -259,14 +301,14 @@ async function sendOrderPDFEmail(toEmail, orderData) {
 
 
   
-
+//User / pass više ne važe – Ethereal često gasi naloge posle nekog vremena.Uloguj se na Ethereal
   let transporter = nodemailer.createTransport({
     host: "smtp.ethereal.email",
     port: 587,
     secure: false,
     auth: {
-      user: "kavon.klocko6@ethereal.email", // ubaci podatke sa Ethereal-a
-      pass: "kmTyGFBCkkMWq3QYuW"
+      user: "danika.tillman6@ethereal.email", // ubaci podatke sa Ethereal-a
+      pass: "UDEJcBbrb7PPEACAhX"
     },
     tls: { rejectUnauthorized: false }
   });
@@ -290,140 +332,152 @@ async function sendOrderPDFEmail(toEmail, orderData) {
 //Ukratko: nar_id se nikad ne šalje iz fronta, već ga MySQL generiše sam.Zato ti provera trenutno uvek pada jer nar_id nije u req.body.
 
 //Problem: ti tražiš i nar_id u telu zahteva, ali nar_id je AUTO_INCREMENT primarni ključ u bazi, znači ne šalje se sa frontenda — baza ga sama kreira, nikad Auto increment primarni kljuc ne definise u konstanti u okviru post zahteva, jer baza ga sam kreira, znaci ne moze korisnik id da posalje
-app.post('/narudzbenice', (req, res) => {
+
+//Koristimo async/await za redosled operacija.Stavke se ubacuju tek kada znamo ID narudžbenice.Sve greške se prikupljaju i vraćaju u odgovoru.res se šalje tek kada su sve stavke obrađene.
+app.post('/narudzbenice', async (req, res) => {
   const { fk_nar_usr_id, nar_datum, nar_cena, nac_plat, stavke = [] } = req.body;
 
   if (!fk_nar_usr_id || !nar_datum || !nar_cena || !nac_plat) {
     return res.status(400).json({ error: 'Nedostaju obavezni podaci' });
   }
 
-  // 1) Ubacivanje narudžbenice
-  const sqlNar = `
-    INSERT INTO narudzbenice (nar_datum, fk_nar_usr_id, nar_cena, nac_plat)
-    VALUES (?, ?, ?, ?)
-  `;
-  //conn.query callback ne sme da se zatvori sa ) pre nego što završiš telo funkcije. Ispravno je ovako:
-  conn.query(sqlNar, [nar_datum, fk_nar_usr_id, nar_cena, nac_plat], (err, insertResult) => {
-    if (err) {
-      console.error('Greška pri dodavanju narudžbenice:', err);
-      return res.status(500).json({ error: 'Greška pri dodavanju narudžbenice' });
-    }
-
-    //tvovoj nar_id je definisan unutar callback-a conn.query za narudžbenicu, ali kod za ubacivanje stavki je van tog callback-a. Zato Node.js javlja ReferenceError: nar_id is not defined — jednostavno, u tom delu koda nar_id ne postoji.🔑 Bitno: Sve što zavisi od nar_id mora biti unutar callback-a gde je nar_id definisan.
+  try {
+    // 1) Ubaci narudžbenicu
+    const insertResult = await new Promise((resolve, reject) => {
+      const sqlNar = `
+        INSERT INTO narudzbenice (nar_datum, fk_nar_usr_id, nar_cena, nac_plat)
+        VALUES (?, ?, ?, ?)
+      `;
+      conn.query(sqlNar, [nar_datum, fk_nar_usr_id, nar_cena, nac_plat], (err, result) => {
+        if (err) return reject(err);
+        resolve(result);
+      });
+    });
 
     const nar_id = insertResult.insertId;
 
-    
-  // 2) Ako nema stavki
-    if (!Array.isArray(stavke) || stavke.length === 0) {
-      return res.status(201).json({
-        success: true,
-        message: 'Narudžbenica sačuvana (bez stavki)',
-        nar_id
-      });
-//  // 3) Bulk INSERT stavki — mora biti unutar callback-a jer koristi nar_id
-    } // 3) Bulk INSERT stavki
-    const values = stavke.map(s => {
-      const kolicina = Number(s.stv_kolicina) || 0;
-      const cena     = Number(s.stv_cena) || 0;
-      const ukCena   = kolicina * cena;
-      return [kolicina, cena, s.fk_stv_pro_id, nar_id, ukCena];
-  
-  });
+    // 2) Ubaci stavke
+    let greske = [];
+    if (stavke.length > 0) {
+      for (const s of stavke) {
+        //U terminalu cemo videti ako je stigla stavka super ako nije to znaci da je do frontenda a nee do backenda, tacnije iz frontenda ili iz test JSON-a ne stižu ta polja.
+        console.log("📦 Stigla stavka:", s);
+        const kolicina = Number(s.stv_kolicina) || 0;
+        const cena = Number(s.stv_cena) || 0;
+        const ukCena = kolicina * cena;
 
- const sqlStavke = `
-      INSERT INTO stavke (stv_kolicina, stv_cena, fk_stv_pro_id, fk_stv_nar_id, uk_stv_cena)
-      VALUES ?
-    `;
-    conn.query(sqlStavke, [values], (err2) => {
-  if (err2) {
-    console.error('Greška pri dodavanju stavki:', err2);
-    return res.status(500).json({ error: 'Greška pri dodavanju stavki' });
-  }
+        try {
+          // Lager
+          const lagerRez = await new Promise((resolve, reject) => {
+            conn.query('SELECT pro_lager FROM proizvodi WHERE pro_id = ?', [s.fk_stv_pro_id], (err, results) => {
+              if (err) return reject(err);
+              resolve(results[0]);
+            });
+          });
 
-  // 4) Dohvati email korisnika iz users tabele
-  const sqlUser = `SELECT usr_email FROM users WHERE usr_id = ?`;
-  conn.query(sqlUser, [fk_nar_usr_id], (err3, results) => {
-    if (err3 || results.length === 0) {
-      console.error('Greška pri dohvaćanju korisnikovog emaila:', err3);
-      return res.status(500).json({ error: 'Greška pri dohvaćanju korisnikovog emaila' });
+          if (!lagerRez || lagerRez.pro_lager < kolicina) {
+            greske.push(`Nema dovoljno na lageru za proizvod ${s.fk_stv_pro_id}`);
+            continue;
+          }
+         
+
+console.log("📥 Ubacujem stavke za nar_id =", nar_id, "Stavke:", stavke);
+          // Insert stavke
+          //Backend prima saomo fk_stv_pro_id: 118, uk_stv_cena: null, zato u bazi ne mozemo videti popunjena polja stv cena i uk stv cena kao ni stv kolicina },
+          await new Promise((resolve, reject) => {
+            const sqlStavka = `
+              INSERT INTO stavke (fk_stv_pro_id, fk_stv_nar_id, stv_kolicina, stv_cena, uk_stv_cena)
+              VALUES (?, ?, ?, ?, ?)
+              ON DUPLICATE KEY UPDATE
+                stv_kolicina = stv_kolicina + VALUES(stv_kolicina),
+                uk_stv_cena = VALUES(stv_cena) * VALUES(stv_kolicina)
+            `;
+            conn.query(sqlStavka, [s.fk_stv_pro_id, nar_id, kolicina, cena, ukCena], (err) => {
+              if (err) return reject(err);
+              resolve();
+            });
+          });
+
+          // Lager update
+          await new Promise((resolve, reject) => {
+            conn.query('UPDATE proizvodi SET pro_lager = pro_lager - ? WHERE pro_id = ?', [kolicina, s.fk_stv_pro_id], (err) => {
+              if (err) return reject(err);
+              resolve();
+            });
+          });
+
+        } catch (err) {
+          greske.push(`Greška za proizvod ${s.fk_stv_pro_id}: ${err.message}`);
+        }
+      }
     }
 
-    const korisnikovEmail = results[0].usr_email;
-    console.log('✅ Narudžbenica i stavke ubačene, nar_id =', nar_id)
-
-     // 5) Dohvati nazive proizvoda i cene za stavke
-    const proIds = stavke.map(s => s.fk_stv_pro_id);
-    const sqlProizvodi = `SELECT pro_id, pro_iupac, pro_cena FROM proizvodi WHERE pro_id IN (?)`;
-
-    conn.query(sqlProizvodi, [proIds], (err4, proRez) => {
-      if (err4) {
-        console.error('Greška pri dohvaćanju proizvoda:', err4);
-        return res.status(500).json({ error: 'Greška pri dohvaćanju proizvoda' });
-      }
-
-      const stavkeSaNazivima = stavke.map(s => {
-        const p = proRez.find(pr => pr.pro_id === s.fk_stv_pro_id);
-        console.log('➡️ Stavka:', s, '=> Proizvod:', p);
-        return {
-          naziv: p ? p.pro_iupac : "Nepoznata stavka",
-          stv_kolicina: s.stv_kolicina || 1,
-          stv_cena: p ? p.pro_cena : 0,
-          uk_stv_cena: (s.stv_kolicina || 1) * (p ? p.pro_cena : 0),
-        };
+    // 3) Dohvati korisnika i podatke za fakturu
+    const userData = await new Promise((resolve, reject) => {
+      const sqlUser = `
+        SELECT users.usr_id, users.usr_name, users.usr_email, kompanije.kmp_adresa, kompanije.kmp_naziv 
+        FROM users 
+        LEFT JOIN kompanije ON users.fk_usr_kmp_id = kompanije.kmp_id
+        WHERE users.usr_id = ?
+      `;
+      conn.query(sqlUser, [fk_nar_usr_id], (err, results) => {
+        if (err || results.length === 0) return reject(err || new Error("Nema korisnika"));
+        resolve(results[0]);
       });
+    });
 
-      //Pre nego sto prosledimo sendOrderPDF moramo reba da napraviš jedan objedinjeni objekat orderData koji uključuje:informacije o narudžbenici (nar_id, nar_datum, nar_cena)informacije o kupcu (kupac_ime, kupac_email, kupac_firma, kupac_adresa)stavke sa nazivima i cenama (stavkeSaNazivima)I onda ga proslediš funkciji sendOrderPDFEmail:
-      // U narudzbenice.js, nakon što ubaciš stavke u bazu
-const sqlUser = `
-  SELECT users.usr_id, users.usr_name, users.usr_email, kompanije.kmp_adresa, kompanije.kmp_naziv 
-  FROM users 
-  LEFT JOIN kompanije ON users.fk_usr_kmp_id = kompanije.kmp_id
-  WHERE users.usr_id = ?
-`;
+    // 4) Dohvati proizvode
+    const proIds = stavke.map(s => s.fk_stv_pro_id);
+    const proRez = await new Promise((resolve, reject) => {
+      const sqlPro = `SELECT pro_id, pro_iupac, pro_cena FROM proizvodi WHERE pro_id IN (?)`;
+      conn.query(sqlPro, [proIds], (err, results) => {
+        if (err) return reject(err);
+        resolve(results);
+      });
+    });
 
-conn.query(sqlUser, [fk_nar_usr_id], (errUser, resultsUser) => {
-  if (errUser || resultsUser.length === 0) {
-    return res.status(500).json({ error: "Greška pri dohvatanju korisnika" });
-  }
+    const stavkeSaNazivima = stavke.map(s => {
+      const p = proRez.find(pr => pr.pro_id === s.fk_stv_pro_id);
+      return {
+        
+            fk_stv_pro_id: s.fk_stv_pro_id,   // 👈 DODAJ OVO
+        naziv: p ? p.pro_iupac : "Nepoznata stavka",
+        stv_kolicina: s.stv_kolicina || 1,
+        stv_cena: p ? p.pro_cena : 0,
+        uk_stv_cena: (s.stv_kolicina || 1) * (p ? p.pro_cena : 0),
+      };
+    });
 
-  const userData = resultsUser[0];
+    // 5) Sastavi podatke za mejl
+    const orderData = {
+      nar_id,
+      nar_datum,
+      nar_cena,
+      kupac_ime: userData.usr_name,
+      kupac_firma: userData.kmp_naziv || "-",
+      kupac_email: userData.usr_email,
+      kupac_adresa: userData.kmp_adresa || "-",
+      stavke: stavkeSaNazivima
+    };
 
-  const orderData = {
-    nar_id,
-    nar_datum,
-    nar_cena,
-    kupac_ime: userData.usr_name,
-    kupac_firma: userData.kmp_naziv || "-",
-    kupac_email: userData.usr_email,
-    kupac_adresa: userData.kmp_adresa || "-",
-    stavke: stavkeSaNazivima
-  };
+    // 6) Pošalji mejl sa PDF-om
+    await sendOrderPDFEmail(userData.usr_email, orderData);
 
-
-
-    // 5) Pošalji mejl sa PDF-om
-sendOrderPDFEmail(userData.usr_email, orderData)
-  .then(() => {
     res.status(201).json({
       success: true,
       message: 'Narudžbenica i stavke uspešno sačuvane, mejl poslat',
-      nar_id
+      nar_id,
+      greske
     });
-  })
-  .catch(err => {
-    console.error("❌ Greška pri slanju mejla:", err);
-    res.status(500).json({ error: 'Greška pri slanju mejla' });
-  });
+
+  } catch (err) {
+    console.error('❌ Greška pri dodavanju narudžbenice:', err);
+    res.status(500).json({ error: 'Greška pri dodavanju narudžbenice', details: err.message });
+  }
+});
 
 
-   
-    });
-    }); // ← ovo zatvara conn.query callback
-})
-});
-});
-});
+
 
 
     

@@ -31,41 +31,53 @@ app.get("/", function (req, res) {
     res.json({ message: "Hello" });
 });
 
-app.get("/favicon.ico", (req, res) => {
-    res.status(204); // No Content
-    res.end();
-});
 
-app.get("/piktogrami", function (req, res) {
-    var search = req.query.search;
 
-    const queryCallback = (err, results, fields) => {
-        if (err) throw err;
+// 1️⃣ Vraća sve piktograme
+app.get("/piktogrami", (req, res) => {
+    const search = req.query.search;
+    let query = "SELECT * FROM piktogrami";
+    let params = [];
 
-        // Convert BLOB to Base64
-        results.forEach(row => {
-            if (row.pkt_blob) {
-                // Convert Buffer to Base64
-                const base64String = Buffer.from(row.pkt_blob).toString('base64');
-                console.log("Original BLOB data: ", row.pkt_blob);
-                console.log("Converted Base64 data: ", base64String);
-                row.image_base64 = base64String;
-                delete row.pkt_blob;
-            } else {
-                console.log("No BLOB data found for row:", row);
-            }
-        });
-
-        console.log("Final JSON response: ", JSON.stringify(results, null, 2));
-        res.json({ "data": results });
-    };
-
-    if (search === undefined) {
-        conn.query("SELECT * FROM piktogrami", queryCallback);
-    } else {
-        conn.query("SELECT * FROM piktogrami WHERE pkt_iupac LIKE ?", ["%" + search + "%"], queryCallback);
+    if (search) {
+        query += " WHERE pkt_iupac LIKE ?";
+        params.push("%" + search + "%");
     }
+
+    conn.query(query, params, (err, results) => {
+        if (err) {
+            console.error("Greška u SQL upitu:", err);
+            return res.status(500).json({ error: "Greška servera" });
+        }
+        res.json(results);
+    });
 });
+
+// 2️⃣ Vraća proizvode za selektovani piktogram
+app.get("/piktogrami/proizvodi", (req, res) => {
+    const pktId = req.query.piktogram;
+
+    if (!pktId) {
+        return res.status(400).json({ error: "Nedostaje parametar piktogram" });
+    }
+
+    const query = `
+       SELECT proizvodi.pro_id, proizvodi.pro_iupac
+FROM proizvodi
+JOIN piktogrami_proizvodi ON proizvodi.pro_id = piktogrami_proizvodi.pro_id
+JOIN piktogrami ON piktogrami.pkt_id = piktogrami_proizvodi.pkt_id
+WHERE piktogrami.pkt_id = ?
+    `;
+
+    conn.query(query, [pktId], (err, results) => {
+        if (err) {
+            console.error("Greška u SQL upitu:", err);
+            return res.status(500).json({ error: "Greška servera" });
+        }
+        res.json(results);
+    });
+});
+
 
 app.listen(port, function () {
     console.log("web server radi na portu " + port);

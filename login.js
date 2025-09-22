@@ -52,7 +52,7 @@ app.post("/login", (req, res) => {
 
   conn.query(
     //Da pri logovanju odmah znamo email i naziv kompanije korisnika, informacije hvatamo u local storage
-    "SELECT usr_id, usr_name, usr_email, usr_password, usr_phone, usr_level, fk_nar_id,  kompanije.kmp_naziv FROM users LEFT JOIN kompanije ON users.fk_usr_kmp_id = kompanije.kmp_id WHERE usr_email=? AND usr_password=?",
+    "SELECT usr_id, usr_name, usr_email, usr_password, usr_phone, usr_level, fk_nar_id,  kompanije.kmp_naziv, kompanije.kmp_pib, kompanije.kmp_adresa FROM users LEFT JOIN kompanije ON users.fk_usr_kmp_id = kompanije.kmp_id WHERE usr_email=? AND usr_password=?",
     [email, password],
     (err, rows, fields) => {
       if (err) {
@@ -66,6 +66,8 @@ app.post("/login", (req, res) => {
         res.status(401).json({"Result": "ERR", "Message": "Invalid credentials"});
         return;
       }
+
+      
 
       res.json({"Result": "OK", "data": rows[0]});
       console.log('JSON odgovor:', {"Result": "OK", "data": rows[0]});

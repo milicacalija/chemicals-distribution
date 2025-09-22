@@ -1,90 +1,96 @@
 <template>
+  <div class="checkout-page">
 
-  <div>
-    <h2>Detalji plaćanja porudžbenice</h2>
-     <!-- Dugmad za akcije  Jasno, želiš da ceo taj blok sa informacijama o plaćanju i izborom metode bude sa desne strane ekrana, dok sa leve strane ostaje lista proizvoda. Možeš to uraditi koristeći flexbox ili grid u CSS-u. Evo primer kako da organizuješ HTML i stilove:-->
-<div class="checkout-page">
-  <!-- Leva strana: Korpa / lista proizvoda -->
-         <Korpa
-           
-  :cart-items="cartItems"
-  :items-map="itemsMap"
-  @remove-item="removeFromCart"
-  @clear-cart="clearCart"
-  @checkout="placanjePouzecem"
-  @go-to-checkout="goToCheckout"
-/>
- <!-- Desna strana: plaćanje i informacije  //Tvoj <button> sa @click="placanjePouzecem()" se nalazi unutar <form>, ali nije type="button", što znači da se ponaša kao type="submit" dugme po defaultu. Zato se:
+    <!-- Leva strana: Korpa / lista proizvoda -->
+    <div class="cart-column">
+      <div class="cart-details" v-if="cartItems.length > 0">
+        <h3>Stavke u korpi</h3>
 
-Swal.fire() samo na trenutak prikaže, pa stranica odmah "refreshuje" jer form pokušava da se pošalje. -->
-    <div class="payment-sidebar">
-   <div class="shipping-advice">
-      <strong> Rok za isporuku porudžbine 3-5 dana.</strong> 
-      Prilikom izbora načina plaćanja kliknite na kružić!
+        <div v-for="item in cartItems" :key="item.fk_stv_pro_id" class="cart-item">
+          <!-- Slika proizvoda -->
+          <img
+            :src="getImageUrl(itemsMap[item.fk_stv_pro_id])"
+            :alt="itemsMap[item.fk_stv_pro_id]?.pro_iupac || 'Nepoznat proizvod'"
+            @error="handleImageError($event, itemsMap[item.fk_stv_pro_id]?.pro_iupac)"
+            class="cart-item-image"
+          />
+
+          <!-- Info o proizvodu -->
+          <div class="cart-item-info">
+            <span class="product-name">{{ itemsMap[item.fk_stv_pro_id]?.pro_iupac || 'Nepoznat proizvod' }}</span>
+            <span class="quantity">Količina: {{ item.stv_kolicina }} kom</span>
+            <span class="price">Cena: {{ item.uk_stv_cena.toFixed(2) }} RSD</span>
+          </div>
+
+          <!-- Akcije na stavku -->
+          <div class="cart-item-actions">
+             <button type="button" class="logout-btn" @click="removeFromCart(item)">
+Ukloni        </button>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Prazna korpa -->
+      <div v-else class="empty-cart">
+        <p>Vaša korpa je prazna.</p>
+      </div>
     </div>
-  
-    
-
-    <form id="myForm">
-      <label class="payment-label">
-        <span class="payment-span"><strong>Izaberite način plaćanja:</strong></span>
-      </label>
-        <!-- DODATO type="button" -->
-  <button type="button" class="add-korpa" @click="placanjePouzecem()">Plati pouzećem</button>
-
-  <!-- DODATO type="button" -->
-  <button type="button" class="add-korpa" @click="goToCheckout()">Naruči proizvod</button>
-
-      <div>
-  <label for="card">Kreditna ili debitna kartica</label>
-  <input
-  type="radio"
-  id="card"
-  value="card"
-  v-model="selectedPaymentMethod"
-  @change="openModal"
-/>
+<!-- Desna strana: plaćanje i informacije -->
+<div class="payment-sidebar">
+  <div class="shipping-advice">
+  <strong><span class="shipping-text">Rok za isporuku porudžbine 3-5 dana.</span></strong>
+  <p>Prilikom izbora načina plaćanja kliknite na kružić!</p>
 </div>
-      <!-- Modal za plaćanje karticom, da ne bi bila greska missing cartItem prop mora se u paymentform roditeljskoj komponenti pored oreder dodeliti cartitems(to je dodato ispod u kodu, u payment formi mora se koristiti direkto camelCase, naci vodi racuna da tkao isto prosledis i kao prop, zato se vraca prazan niz cartItems, nije isto bilo u payment-form i u prop,,,Ali u Vue template-u moraš koristiti kebab-case (sa crticama), NE camelCase.), dakle nije dobro cart-Itemsm, mora sve malim slovima sa crticom izmedju cart-items je ispravo -->
-<div v-if="isModalOpen">
-  
-  <div>
-    <h2>Nastavak kupovine</h2>
-    <p>{{ cartItems }}</p> <!-- da proveriš da li je definisan -->
-    <payment-form :cart-items="cartItems" :order="order" />
 
+  <!-- Modal za karticu -->
+  <div v-if="isModalOpen">
+    <div class="payment-modal">
+      <h2>Nastavak kupovine</h2>
+      <payment-form :cart-items="cartItems" :order="order" />
+    </div>
   </div>
 
-   </div>
- 
+  <!-- Forma plaćanja -->
+  <form id="myForm">
+    <label class="payment-label">
+      <strong>Izaberite način plaćanja:</strong>
+    </label>
 
-     
+    <!-- Plaćanje pouzećem -->
+    <div class="payment-option">
+      <input 
+        type="radio" 
+        id="pouzece" 
+        value="pouzece" 
+        v-model="selectedPaymentMethod"
+        @click="kreirajNarudzbenicu('Pouzećem')"
+      />
+      <label for="pouzece">Plaćanje pouzećem</label>
+    </div>
 
-      <div>
-        <label for="bank_transfer">Bankovni transfer</label>
-        <input type="radio" id="bank_transfer" value="bank_transfer" v-model="selectedPaymentMethod">
-      </div>
+    <!-- Kreditna kartica -->
+    <div class="payment-option">
+      <input
+        type="radio"
+        id="card"
+        value="card"
+        v-model="selectedPaymentMethod"
+    @click="kreirajNarudzbenicu('Kartica')"       />
+      <label for="card">Kreditna ili debitna kartica</label>
+    </div>
+  </form>
+</div>
+</div>
 
-      <div>
-        <label for="cash_on_delivery">Plaćanje pouzećem</label>
-        <input type="radio" id="cash_on_delivery" value="cash_on_delivery" v-model="selectedPaymentMethod">
-      </div>
-    </form>
-    <button @click="potvrdiPorudzbinu">Potvrdi poruddžbinu</button>
-<!-- U nastKupovine.vue, u delu gde koristiš PaymentForm, moraš da dodaš :order="nekiObjekat".
-Ako već imaš neki podatak o porudžbini (npr. proizvod koji je korisnik izabrao), onda:  Rešenje je da u trenutku prosleđivanja prop-a u PaymentForm garantuješ da order uvek bude objekat, makar prazan. greska ovog tipa znaci Invalid prop: type check failed for prop "order". Expected Object, got String with value "proizvod || {}".
-, U template-u kad prosleđuješ prop, treba da koristiš dvotačku (:) da označiš da šalješ izraz, a ne string litera, Bez Vue tretira vrednost kao string "proizvod || {}" umesto da izvrši <izraz class=" nikako paymentForm, vue ne dozvoljava, payment-form moze-
-Da bi radilo koristiti v-if model za payment-form-->
-
-
-
-</div></div></div>
+  
 </template>
 
 <script>
 import Korpa from '@/components/Korpa.vue';
 import cartMixin from '@/mixins/cartMixin';
-import Stavke from '@/components/Stavke.vue';
+import { getImageUrl } from '@/components/korpaimg.js';
+
 
 
 //U tvom template-u imaš komponentu PaymentForm koja zahteva prop order, ali u script delu nisi povezala taj prop sa bilo čim. Tako da Vue baca grešku da je order prop obavezan, a ti ga ne prosleđuješ.
@@ -93,14 +99,17 @@ export default {
   mixins: [cartMixin],
  name: 'Nastkupovine',
  
+
   //moramo definisati ime komponente prvo ide components pa onda inde props
  
  components: {
     PaymentForm,
     Korpa,
-    Stavke
+   
+    
 //Ako cartItems stiže iz roditelja, ne diraj data za cartItems.Ako nema roditelja, izbaci props i definiši cartItems u data sa localStorage.
   },
+  
   
   data() {
     //Greška "Missing required prop: 'order'" znači da komponenta (npr. PaymentForm) očekuje order kao prop, ali joj ne prosleđuješ ništa., fali cartItems, a mora da se prenose proizvodi koji su u korpi do trenutka placanja
@@ -108,6 +117,7 @@ export default {
     return {
                 // povlačimo iz localStorage da bi lista uvek postojala
           order: {},//bilo je null ali msilim da ta vrednost ne sme biti za order, nego treba da ga vuce kao objekat
+              cartItems: [],  // obavezno inicijalizovati!
     stripe: null,
     elements: null,
     cardElement: null,
@@ -125,19 +135,28 @@ export default {
  //Ah, sad je jasno — greška “Getter is missing for computed property 'methods'” se javlja zato što si u computed delu definisala nešto što nije funkcija, ili si slučajno stavila methods unutar computed.
   
   methods: {
+     getImageUrl(item) {
+      return getImageUrl(item);
+    },
+    handleImageError(event, pro_iupac) {
+  console.warn(`Slika nije pronađena za: ${pro_iupac}`);
+  if (event && event.target) {
+    event.target.src = '/images/korpica.png'; // fallback
+  }
+    console.warn(`Slika nije pronađena za: ${pro_iupac}`);
+  },
          // 👉 čuvanje korpe i prebacivanje na checkout stranicu
      
       
        // 👉 otvori modal ako korisnik izabere karticu
-    openModal() {
-    if (this.selectedPaymentMethod === 'card') {
-      // Pre nego što odeš na PaymentForm, sačuvaj potrebne podatke
-      localStorage.setItem('cartItems', JSON.stringify(this.cartItems));
-      localStorage.setItem('items', JSON.stringify(this.items));
-      
-      // Idi na stranicu PaymentForm
-      this.$router.push({ name: 'PaymentForm' }); // prilagodi ako koristiš path umesto name
-    }},
+// 👉 Dugme "Kreditna kartica" automatski kreira narudžbenicu i vodi na PaymentForm, U openModal() ti pozivaš odmah this.kreirajNarudzbenicu('Kartica'), ali ne otvaraš modal.✅ Rešenje: umesto toga prvo otvori modal, pa tek onda pozovi narudžbenicu ili unutar PaymentForm.
+ openModal() {
+  if (this.selectedPaymentMethod === 'card') {
+    this.isModalOpen = true; // otvori modal
+    // ovde možeš ili odmah kreirati narudžbenicu,
+    // ili čekati da PaymentForm to završi
+  }
+},
   
     closeModal() {
       this.isModalOpen = false;
@@ -150,6 +169,13 @@ export default {
     },
  
   mounted() {
+
+    // Debug: provera slika za sve stavke
+  this.cartItems.forEach(item => {
+      console.log('[DEBUG] Stavka u korpi:', item);
+    const url = this.getImageUrl(item);
+    console.log('[DEBUG] Stavka:', item.fk_stv_pro_id, '-> URL:', url);
+  });
     // Proveri da li postoji 'msg' u query parametrima, da lepo poruku umesto URL vidimo na frontendu , da je uspesno porucen proizvod
     if (this.$route.query.msg) {
       alert(decodeURIComponent(this.$route.query.msg));  // Prikazi alert sa porukom
@@ -162,12 +188,16 @@ export default {
     this.cartItems = JSON.parse(savedCart); // Učitaj korpu iz localStorage
   }
      // Ako imaš i porudžbinu:
+    //Imaš grešku da order nije objekat. Ti si ga inicijalizovala sa {} i to je ok, ali kad ga učitavaš iz localStorage, možda se upisuje string ili null.Rešenje: pri parsiranju obavezno fallback (vracanje greske):
     const storedOrder = localStorage.getItem('order');
     if (storedOrder) {
-      this.order = JSON.parse(storedOrder);
-    }
+      try {
+    this.order = JSON.parse(storedOrder) || {};
+  } catch (e) {
+    this.order = {};
   }
-  }
+}
+  }}
   //Da li prvo ide mounted ili method apsolutno je svejedno Vue ce rendovati kako treba, samo voditi racuna da posle data ide methods ili mounted
 
   
@@ -175,103 +205,183 @@ export default {
 </script>
 
 <style scoped>
+
 .checkout-page {
   display: flex;
-  align-items: flex-start;
-  gap: 10px; /* razmak između leve i desne strane */
-  padding: 20px;
-  margin-top: 0; /* pomera sidebar više nadole ili gore */}
+  justify-content: center;  /* centriranje u horizontalnoj ravni */
+  align-items: flex-start;  /* poravnanje na vrh */
+  gap: 30px;                /* razmak između leve i desne kolone */
+  padding: 40px 20px;       /* razmak od ivica prozora */
+  flex-wrap: wrap;           /* ako je ekran uži, kolone idu jedna ispod druge */
+}
 
-
-.payment-sidebar {
-  width: 300px; /* fiksna širina sidebar-a */
-  border: 1px solid #ccc;
-  border-radius: 10px;
-  padding: 15px;
+.cart-column {
+  width: 500px;             /* širina leve kolone */
+  max-height: 80vh;
+  overflow-y: auto;
   background-color: #f9f9f9;
-  box-shadow: 0 4px 10px rgba(0,0,0,0.1);
-  margin-left: 0; /* maksimiziramo da bude blizu Korpe */
-  margin-top: 150px; /* pomeranje malo dole */
-}
-.shipping-advice {
-  background-color: #f9f9f9; /* Svetlo siva pozadina */
-  border: 2px solid #ddd; /* Svetla ivica */
-  padding: 15px; /* Unutrašnje margine */
-  margin: 20px auto; /* Gornja i donja margina, automatsko centriranje */
-  border-radius: 8px; /* Zaobljeni uglovi */
-  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1); /* Blaga senka za efekat izdizanja */
-  font-size: 18px; /* Veličina fonta */
-  line-height: 1.5; /* Prostor između linija teksta */
-  max-width: 600px; /* Maksimalna širina box-a */
-  width: 90%; /* Box će zauzimati 90% širine ekrana do max-width */
-}
-.button-container {
-  display: flex;
-  justify-content: center; /* Centriranje horizontalno */
-  margin-top: 10px; /* Razmak od drugih elemenata */
-}
-
-.add-korpa {
-  width: 150px; /* Širina dugmeta, prilagodite prema potrebama */
-  padding: 10px; /* Dodajte padding za bolji izgled */
-  background-color: #4e2fa5; /* Pozadina dugmeta */
-  color: white; /* Boja teksta na dugmetu */
-  border: none; /* Uklonite obrub dugmeta */
-  border-radius: 5px; /* Oblikovanje radijusa */
-  font-size: 16px; /* Veličina fonta */
-  cursor: pointer; /* Promeni kursor kada je dugme u fokusu */
-  text-align: center; /* Centriranje teksta unutar dugmeta */
-  transition: background-color 0.3s, transform 0.2s; /* Dodajte prelaz za efekte */
-}
-
-.add-korpa:hover {
-  background-color: #2a1564; /* Promena boje pozadine pri prelazu miša */
-}
-
-.add-korpa:active {
-  transform: scale(0.98); /* Efekat pritiska dugmeta */
-}
-
-.payment-label {
-  display: block;
-  margin-bottom: 10px;
-}
-
-.card-selection {
-  margin-top: 10px;
-}
-
-.card-logo {
-  width: 50px;
-  margin-right: 10px;
-}
-
-button {
-  margin-top: 20px;
-}
-.cart-container {
-  max-width: 100px;
-  margin: 0 auto;
   padding: 20px;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
 }
 
 .cart-item {
-   max-width: 100px;
   display: flex;
   align-items: center;
-  border-bottom: 1px solid #ccc;
-  padding: 15px 0;
+  gap: 15px;
+  padding: 10px;
+  border-bottom: 1px solid #ddd;
 }
 
-.cart-img {
-  width: 80px;   /* smanjena širina */
-  height: 80px;  /* smanjena visina */
-  object-fit: cover;
-  border-radius: 8px;
+.cart-item:last-child {
+  border-bottom: none;
+}
+
+.cart-item-image {
+  width: 240px;       /* znatno veća širina */
+  height: 240px;      /* proporcionalna visina */
+  object-fit: contain; /* slika se ne seče */
+  border-radius: 5px;
+  border: 1px solid #ccc;
+  background-color: #f9f9f9;
   margin-right: 15px;
 }
-
-.cart-details {
-  flex: 1;
+.cart-item {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  padding: 10px;
+  border-bottom: 1px solid #e0e0e0;
 }
+.cart-item-info {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+.cart-item-actions {
+  margin-left: auto;
+  display: flex;
+  gap: 5px;
+}
+
+.cart-item-actions button:hover {
+  background-color: #641515;
+}
+.product-name {
+  font-weight: bold;
+  margin-bottom: 5px;
+}
+
+.quantity, .price {
+  font-size: 0.9rem;
+  color: #555;
+}
+
+
+
+
+.empty-cart {
+  text-align: center;
+  color: #888;
+  padding: 20px;
+}
+.logout-btn {
+  margin-top: 20px;
+  padding: 10px 40px; /* veći padding = veće dugme */
+  border-radius: 20px;
+    background-color: #7c3b3b;
+
+  color: white;
+  border: none;
+  cursor: pointer;
+  display: block;
+  margin-left: auto;
+  margin-right: auto;
+  font-weight: normal;
+  font-size: 16px; /* povećava tekst u dugmetu */
+}
+
+
+/* Cela desna strana */
+.payment-sidebar {
+  width: 320px;
+  padding: 20px;
+  background-color: #f9f9f9;
+  border-radius: 12px;
+  box-shadow: 0 0 15px rgba(0,0,0,0.1);
+  font-family: Arial, sans-serif;
+}
+
+/* Rok za isporuku */
+.shipping-advice {
+  margin-bottom: 20px;
+}
+.shipping-advice strong {
+  font-weight: 600;
+  font-size: 16px;
+  color: #641515;
+}
+.shipping-advice p {
+  font-size: 14px;
+  color: #333;
+}
+
+/* Forma plaćanja */
+form#myForm {
+  display: flex;
+  flex-direction: column;
+}
+
+/* Label "Izaberite način plaćanja" */
+.payment-label {
+  margin-bottom: 12px;
+  font-size: 16px;
+  font-weight: 600;
+  color: #333;
+}
+
+/* Pojedinačna opcija plaćanja */
+.payment-option {
+  display: flex;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+/* Radio dugme */
+.payment-option input[type="radio"] {
+  width: 20px;
+  height: 20px;
+  margin-right: 12px;
+  accent-color: #641515; /* boja kada je selektovano */
+  cursor: pointer;
+}
+
+/* Label pored radio dugmeta */
+.payment-option label {
+  font-size: 16px;
+  font-weight: 500;
+  cursor: pointer;
+  user-select: none;
+}
+
+/* Dugme Plati pouzećem */
+.logout-btn {
+  margin-top: 10px;
+  padding: 12px 20px;
+  border-radius: 20px;
+  background-color: #641515;
+  color: white;
+  border: none;
+  cursor: pointer;
+  font-size: 16px;
+  display: inline-block;
+  text-align: center;
+}
+
+.logout-btn:hover {
+  background-color: #800000;
+  transition: 0.3s;
+}
+
+
 </style>

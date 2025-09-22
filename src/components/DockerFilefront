@@ -1,0 +1,18 @@
+FROM node:20
+
+WORKDIR /app
+
+# Kopira package.json i package-lock.json
+COPY package*.json ./
+
+# Instalira zavisnosti
+RUN npm install
+
+# Kopira sve fajlove frontenda
+COPY . .
+
+# Otvara port koji Vue koristi
+EXPOSE 8080
+
+# Komanda za pokretanje frontend servera
+CMD ["npm", "run", "serve"]

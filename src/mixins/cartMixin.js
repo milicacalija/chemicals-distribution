@@ -1,32 +1,45 @@
+//U tvojoj bazi i backend-u pro_id je broj (INT), ali problem nastaje u JavaScript objektima (itemsMap).Objašnjenje:U JavaScript-u ključevi objekata (keys) su uvek stringovi ili symboli., zato npr kod const product imamo String 
+
 import axios from 'axios';
 import moment from 'moment-timezone';
 import Swal from 'sweetalert2'; //da bi lepsi i pregledniji bio alert sa izmenljivom porukom, da ne pise samo ok
 
 //U Vue komponenti redosled i nivo zagrada mora biti strogo ovakav:export default {  components: { … },  data() { … }, computed: { … }, methods: { … },mounted() { … },created() { … }
-//
+//Gde nastaje problem:cartItems se čitaju odmah iz localStorage.itemsMap se isto učitava odmah, ali ti ga verovatno puniš tek nakon što podaci stignu sa backenda (this.items iz baze).Kada se dodajUkorpu pozove, ti dodaš proizvod u cartItems, ali resolvedCartItems ne može da ga veže jer itemsMap još uvek nije ažuriran.
 export default {
   data() {
     return {
       cartItems: JSON.parse(localStorage.getItem('cart')) || [],
       cartCount: 0,
+      //itemsMap: JSON.parse(localStorage.getItem('itemsMap')) || {}Ovo znači da itemsMap preuzima vrednost iz localStorage.Ali kad ideš na stranicu NastKupovine, localStorage možda još nema itemsMap, ili je prazan.Zato je Object.keys(this.itemsMap).length === 0, i computed resolvedCartItems() vraća [].Kada klikneš na “nastavak kupovine”, cartItems su popunjeni, ali itemsMap iz localStorage nije popunjen, pa Korpa ne može da poveže stavke sa proizvodima.
       itemsMap: JSON.parse(localStorage.getItem('itemsMap')) || {}
     };
   },
+//resolvedCartItems() je samo frontend helper da lepo prikazuje proizvode u korpi.Ako želiš da baza bude ažurna, moraš:Generisati uk_stv_cena i stv_kolicina u frontend-u (to već radiš).Poslati ih u backend rutu koja INSERTuje/UPDATEuje stavke u tabelu stavke.
+  //Moramo sacekati da itemsMap bude učitan pre nego što pokuša da poveže proizvode. Stavke koje još nisu učitane se privremeno ignorišu, a alert se prikazuje samo kada korisnik pokušava da završi kupovinu:
   computed: {
     resolvedCartItems() {
-      const resolved = (this.cartItems || []).map(ci => {
-        const product = this.itemsMap[ci.fk_stv_pro_id];
-        if (!product) {
-          console.warn('⚠️ Nije pronađen proizvod u itemsMap:', ci.fk_stv_pro_id);
-          return null;
-        }
-        return { ...ci, product };
-      }).filter(Boolean);
+      console.log("📦 cartItems:", this.cartItems);
+      console.log("🗺️ itemsMap:", this.itemsMap);
+      //Šta radi svaka komponenta:!this.itemsMap, Proverava da li itemsMap nije definisan (undefined ili null).Ako je itemsMap npr. null ili undefined, uslov će biti true.Object.keys(this.itemsMap).length === 0, Object.keys(obj) vraća niz svih ključeva objekta.Ako je objekat prazan ({}), niz će imati dužinu 0.Dakle, ovo proverava da li je itemsMap prazan objekat.Ako je bilo koji od uslova true, tada:Ispisuje se upozorenje: '⚠️ itemsMap još nije učitan...'Vraća se prazan niz [] da se ne izvršava dalje u computed ili metodi.
+  if (!this.itemsMap || Object.keys(this.itemsMap).length === 0) {
+    console.log('⚠️ itemsMap još nije učitan, čekamo podatke iz baze.');
+    return [];
+  }
 
-      console.log('🛒 resolvedCartItems:', resolved);
-      return resolved;
+  const resolved = (this.cartItems || []).map(ci => {
+  const product = this.itemsMap[String(ci.fk_stv_pro_id)]; // 👈 STRING da se pokopi sa id proizvoda
+      if (!product) {
+      console.warn(`⚠️ Proizvod sa ID ${ci.fk_stv_pro_id} još nije dostupan u itemsMap.`);
+      // Ne vraćamo null odmah, samo preskačemo stavku
+      return null;
     }
-  },
+    return { ...ci, product };
+  }).filter(Boolean);
+
+  console.log('🛒 resolvedCartItems:', resolved);
+  return resolved;
+}},
   methods: {
      async dodajUkorpu(pro_iupac, quantity) {
   //Da proverimo da le je pro_iupac string i da nije undefined 
@@ -103,20 +116,43 @@ removeFromCart(item) {
       localStorage.setItem('cart', JSON.stringify([]));
       console.log('Korpa je očišćena');
     },
-    goToCheckout() {
-      localStorage.setItem('cart', JSON.stringify(this.cartItems));
-              this.$router.push('/nastkupovine');
+goToCheckout() {
+    console.log('>>> Kliknuto: Nastavak kupovine');
+    console.log('cartItems pre navigacije:', this.cartItems);
+    console.log('itemsMap pre navigacije:', this.itemsMap);
 
-      //Imala sam gresku ovog tipa Uncaught (in promise) NavigationDuplicated: Avoided redundant navigation to current location: "/Nastkupovine". jer se naviagacija desava na istoj stranici, tj ja sam bila na stranici Nastkupovine i ovaj deo koda this router poush nakon uspesne kupovine ponovo je pokusavao navigaciju e zato umesto router push mozemo koristiti replace ili jednostavno ako koristimo push promeniti navigaciju (naziv komponenete)
-  if (this.$route.path === '/Nastkupovine') {
-    alert('Poručili ste proizvod, porudžbina će stići za 3-5 dana!');
-  }
-},
+    const isLoggedIn = !!localStorage.getItem('usr_id');
+
+    if (!isLoggedIn) {
+      // Ako korisnik nije ulogovan, SweetAlert i vodi na login
+      Swal.fire({
+        icon: 'warning',
+        
+        text: 'Ne možete poručiti proizvod dok se ne registrujete ili ulogujete!',
+        confirmButtonText: 'Ulogujte se'
+      }).then(() => {
+        this.$router.replace('/uloguj'); // koristi replace da izbegneš grešku
+        // Čuvamo trenutnu korpu u localStorage
+        localStorage.setItem('cart', JSON.stringify(this.cartItems));
+      });
+      return;
+    }
+
+    // Ako je korisnik ulogovan, vodi ga na stranicu Nastavak kupovine
+    if (this.$route.path === '/nastkupovine') {
+      // SweetAlert poruka umesto alert
+      Swal.fire({
+        icon: 'success',
+        title: 'Porudžbina uspešna!',
+        text: 'Porudžbina će stići za 3-5 dana.',
+        confirmButtonText: 'U redu'
+      });
+    } else {
+      this.$router.replace('/nastkupovine'); // koristi replace da izbegneš NavigationDuplicated
+    }
+  },
 //Kombinacija await i then: await treba da bude unutar async funkcije, ali kod tebe Swal.fire() koristi .then() koji može da izazove probleme. Treba da koristiš await za Swal.fire().
-    async placanjePouzecem() {
-  console.log('Placanje pouzećem za proizvod:', this.cartItems);
-
-  // Proveri da li je korpa prazna
+async kreirajNarudzbenicu(nacinPlacanja) {
   if (!this.cartItems.length) {
     Swal.fire({
       icon: 'warning',
@@ -126,121 +162,69 @@ removeFromCart(item) {
     return;
   }
 
-  // Kreiraj osnovnu poruku
-  let message = '';
+  const total = this.cartItems.reduce((sum, item) => sum + item.uk_stv_cena, 0);
+  const shipping = nacinPlacanja === 'Pouzećem' && total < 3000 ? 400 : 0;
+  const finalPrice = total + shipping;
 
-  this.cartItems.forEach(item => {
-    const product = this.itemsMap[item.fk_stv_pro_id];
-    if (product) {
-      message += `• ${product.pro_iupac} — Količina: ${item.stv_kolicina}, Cena: ${(item.uk_stv_cena).toFixed(2)} RSD\n`;
+  Swal.fire({
+    title: 'Obrada narudžbine',
+    text: 'Molimo sačekajte dok se porudžbina obrađuje...',
+    allowOutsideClick: false,
+    didOpen: () => {
+      Swal.showLoading();
     }
   });
 
-  // Izračunaj ukupnu cenu i cenu dostave
-  const total = this.cartItems.reduce((sum, item) => sum + item.uk_stv_cena, 0);
-  console.log("Ukupna cena proizvoda:", total);
+  try {
+    const narudzbenicaData = {
+      fk_nar_usr_id: Number(localStorage.getItem('usr_id')),
+      nar_datum: moment().tz('Europe/Belgrade').format('YYYY-MM-DD HH:mm:ss'),
+      nar_cena: Number(finalPrice),
+      nac_plat: nacinPlacanja,
+      email: localStorage.getItem('userEmail'),
+      stavke: this.cartItems.map(item => ({
+        fk_stv_pro_id: item.fk_stv_pro_id,
+        stv_kolicina: item.stv_kolicina,
+        stv_cena: item.stv_cena,
+        uk_stv_cena: item.uk_stv_cena
+      }))
+    };
 
-  // Ako je ukupna cena MANJA od 3000, dostava je 400 RSD, u suprotnom 0
-  let shipping = total < 3000 ? 400 : 0;
-  console.log("Cena dostave:", shipping);
+    console.log("📤 Slanje narudžbenice:", narudzbenicaData);
 
-  let finalPrice = total + shipping;
+    const response = await axios.post('http://localhost:3005/narudzbenice', narudzbenicaData);
+    localStorage.setItem('nar_id', response.data.nar_id);
 
-  // Dodaj ukupnu cenu i cenu dostave u poruku
-  message += `\nUkupna cena proizvoda: ${total.toFixed(2)} RSD`;
-  message += `\nDostava: ${shipping} RSD`;
-  message += `\nZa plaćanje pouzećem: ${finalPrice.toFixed(2)} RSD`;
+    Swal.close();
 
-  // Ako je korisnik na stranici "Nastkupovine", swall fire nije radio jer u putanji je bilon /Nastkupovine umesto /nastkupovine
-  if (this.$route.path === '/nastkupovine') {
-    try {
-      console.log("Prikazujem Swal poruku...");
-      // Prikazuj pop-up sa potvrdom
-      const result = await Swal.fire({
-        title: 'Poručili ste proizvod',
-        text: message + '\nPorudžbina će stići za 3-5 dana!',
-        icon: 'success',
-        confirmButtonText: 'Potvrdi porudžbinu',
-      });
-
-      // Ako je korisnik potvrdio porudžbinu
-      if (result.isConfirmed) {
-       
-         // Učitaj email iz localStorage
-const userEmail = localStorage.getItem('userEmail');
-console.log('Korisnički email:', userEmail);
-
-        // Proveri da li email postoji
-        if (!userEmail) {
-          Swal.fire({
-            icon: 'warning',
-            title: 'Greška',
-            text: 'Nema sačuvanog email-a korisnika, molimo vas da se prijavite.'
-          });
-          return;
-        }
-
-
-        // Kreiraj podatke o porudžbini, number dodajemo pretvramo vrednosti u brojeve pre slanja na backend
-        const narudzbenicaData = {
-         fk_nar_usr_id: Number(localStorage.getItem('usr_id')),
-  nar_datum: moment().tz('Europe/Belgrade').format('YYYY-MM-DD HH:mm:ss'),
-  nar_cena: Number(total + shipping),
-  nac_plat: 'Pouzećem',
-  email: localStorage.getItem('userEmail'),//Za backend
-   stavke: this.cartItems.map(item => ({
-        stv_kolicina: item.quantity,       // ili tvoja kolona sa količinom
-        fk_stv_pro_id: item.fk_stv_pro_id, // ID proizvoda
-    }))
-};
-
-        
-
-        // Pošaljite podatke na backend
-        const response = await axios.post('http://localhost:3005/narudzbenice', narudzbenicaData);
-        console.log('Uspešno poslana narudžbenica:', response.data);
-        
-        // Nakon što se uspešno pošalje, možeš dodati logiku za obavestenje korisnika
-        // Na primer, možeš ga obavestiti putem Swal da je porudžbina uspešno kreirana
-        Swal.fire({
-          title: 'Porudžbina potvrđena!',
-          text: 'Vaša porudžbina je uspešno poslata i biće isporučena u roku od 3-5 dana.',
-          icon: 'success',
-          confirmButtonText: 'Zatvori'
-        });
+    Swal.fire({
+      title: 'Porudžbina poslata!',
+      text: nacinPlacanja === 'Pouzećem'
+        ? 'Vaša porudžbina je uspešno poslata i biće isporučena u roku od 3-5 dana.'
+        : 'Vaša porudžbina je uspešno kreirana, nastavite plaćanje sa karticom.',
+      icon: 'success',
+      showConfirmButton: false,
+      timer: 4000,
+      timerProgressBar: true
+    }).then(() => {
+      if (nacinPlacanja === 'Kartica') {
+        this.$router.push({ name: 'PaymentForm' });
+      } else {
+        this.$router.push('/');
       }
+    });
 
-    } catch (error) {
-      console.error('Greška prilikom slanja narudžbenice:', error);
-      Swal.fire({
-        title: 'Greška',
-        text: 'Došlo je do greške prilikom slanja narudžbenice. Pokušajte ponovo.',
-        icon: 'error',
-        confirmButtonText: 'Zatvori'
-      });
-    }
+  } catch (err) {
+    Swal.close();
+    console.error('Greška pri porudžbini:', err);
+    Swal.fire({
+      icon: 'error',
+      title: 'Greška',
+      text: 'Došlo je do problema prilikom obrade porudžbine. Pokušajte ponovo.'
+    });
   }
 },
 
-    handlePayment(cardDetails) {
-          console.log('Plaćanje uspešno:', cardDetails);
-          this.closeModal();
-        },
-        potvrdiPorudzbinu() {
-        console.log('Izabrani način plaćanja:', this.selectedPaymentMethod);
-    
-        if (!this.selectedPaymentMethod) {
-          alert('Molimo izaberite način plaćanja.');
-          return;
-        }
-    
-        if (this.selectedPaymentMethod === 'cash_on_delivery') {
-          alert('Izabrali ste plaćanje pouzećem.\nVaša porudžbina će biti poslata u roku od 3-5 dana.');
-          // Ovde možeš dodati logiku za backend POST ka /porudzbina
-        } else {
-          // Kartica ili PayPal, već si otvorila modal, tu se već obrađuje plaćanje
-        }
-      },
       //Funkcija getNarudzbenicaId() služi da učita ID narudžbenice iz localStorage, što može biti korisno za praćenje i identifikaciju određene narudžbenice na klijentskoj strani.
     getNarudzbenicaId() {
   const narudzbenicaId = localStorage.getItem('nar_id');

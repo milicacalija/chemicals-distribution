@@ -1,7 +1,7 @@
 import Vue from 'vue'
 import App from './App.vue'
 import router from './router'
-
+import '@/components/table.css';  // <<< globalni CSS import
 
 Vue.config.productionTip = false
 
